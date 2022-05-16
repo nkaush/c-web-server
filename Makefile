@@ -1,8 +1,9 @@
 OBJS_DIR = .objs
+TEST_DIR = tests
 
 EXE_SERVER = server
 EXE_CLIENT = client
-EXE_TEST = set_test
+EXE_TEST = $(TEST_DIR)/set_test
 
 # set up compiler and linker
 CC = clang
@@ -29,6 +30,7 @@ all: release
 
 $(OBJS_DIR):
 	@mkdir -p $(OBJS_DIR)
+	@mkdir -p $(OBJS_DIR)/$(TEST_DIR)
 
 .PHONY: print 
 print:
@@ -77,7 +79,7 @@ $(EXE_TEST): $(OBJS_TEST:%.o=$(OBJS_DIR)/%-release.o)
 	$(LD) $^ -o $@ 
 
 $(EXE_TEST)-debug: $(OBJS_TEST:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ -o $@ 
+	$(LD) $^ -o $(notdir $@)
 
 .PHONY: clean
 clean:

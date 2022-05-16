@@ -1,5 +1,4 @@
 #include "set.h"
-#include "bitfield.h"
 #include <assert.h>
 #include <string.h>
 
@@ -28,7 +27,6 @@ struct set {
     set_node_t** nodes;
     set_node_t* head;
     set_node_t* tail;
-    bitfield* should_probe;
 
     hash_function_type hash;
     copy_constructor_type copy_constructor;
@@ -49,9 +47,9 @@ size_t find_prime(size_t target) {
 size_t set_find_key(set* this, void* elem) {
     size_t idx = this->hash(elem) % this->capacity;
     
-    while ( bitfield_get(this->should_probe, idx) ) {
+    while ( this->nodes[idx] ) {
         // Slot is not empty, the key matches, and there is no tombstone
-        bool cmp = this->comp(this->nodes[idx]->data, elem);
+        bool cmp = compare_equiv(this->comp, this->nodes[idx]->data, elem);
 
         if (this->nodes[idx] != NULL && !cmp) {
             return idx;
@@ -99,7 +97,6 @@ set* set_create(hash_function_type hash_function,
     this->head = NULL;
     this->tail = NULL;
     this->capacity = find_prime(0);
-    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(set_node_t*));
     
     return this;
@@ -108,7 +105,6 @@ set* set_create(hash_function_type hash_function,
 void set_destroy(set* this) {
     assert(this);
 
-    bitfield_destroy(this->should_probe);
     set_free_all_nodes(this);
     free(this->nodes);
 
@@ -240,15 +236,10 @@ vector* set_elements(set* this) {
     return v;
 }
 
-void set_add(set* this, void* element) {
-    assert(this);
-    
-    if ( set_should_resize(this) )
-        set_reserve(this, this->capacity * 2);
-
+void set_add_helper(set* this, void* element) {
     size_t index = this->hash(element) % this->capacity;
-    while ( bitfield_get(this->should_probe, index) ) {
-        bool cmp = this->comp(this->nodes[index]->data, element);
+    while ( this->nodes[index] ) {
+        bool cmp = compare_equiv(this->comp, this->nodes[index]->data, element);
         if ( this->nodes[index] != NULL && !cmp) 
             return; // found a repeat
 
@@ -271,8 +262,16 @@ void set_add(set* this, void* element) {
         ++this->size;
         this->tail = node;
         this->nodes[index] = node;
-        bitfield_set_true(this->should_probe, index);
     } // else the element already exists
+}
+
+void set_add(set* this, void* element) {
+    assert(this);
+    
+    if ( set_should_resize(this) )
+        set_reserve(this, this->capacity * 2);
+
+    set_add_helper(this, element);
 }
 
 void set_remove(set* this, void* element) {
@@ -280,8 +279,6 @@ void set_remove(set* this, void* element) {
 
     size_t index = set_find_key(this, element);
     if ( this->nodes[index] != NULL ) {
-        bitfield_set_false(this->should_probe, index);
-
         set_node_t* to_delete = this->nodes[index];
         if ( to_delete->previous ) {
             // if 'to_delete' is not the head of the Linked List
@@ -315,9 +312,6 @@ void set_clear(set* this) {
     this->head = NULL;
     this->tail = NULL;
     this->size = 0;
-
-    bitfield_destroy(this->should_probe);
-    this->should_probe = bitfield_create(this->capacity);
 }
 
 void set_reserve(set* this, size_t capacity) {
@@ -325,27 +319,37 @@ void set_reserve(set* this, size_t capacity) {
 
     if ( capacity <= this->capacity )
         return;
-
-    printf("resizing\n");
     
     free(this->nodes);
-    bitfield_destroy(this->should_probe);
 
+    #ifdef DEBUG
+    size_t old_size = this->size;
+    #endif
+
+    this->size = 0;
     this->capacity = find_prime(capacity);
-    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(set_node_t*));
 
     set_node_t* curr = this->head;
-    size_t index = 0;
+    set_node_t* prev = NULL;
+
+    this->head = NULL;
+    this->tail = NULL;
 
     while ( curr != NULL ) {
-        index = set_find_key(this, curr->data);
-        
-        bitfield_set_true(this->should_probe, index);
-        this->nodes[index] = curr;
+        set_add_helper(this, curr->data);
+
+        this->destructor(curr->data);
+        prev = curr;
         curr = curr->next;
+
+        free(prev);
     }
-}
+
+    #ifdef DEBUG
+    assert(this->size == old_size);
+    #endif
+} 
 
 void set_shrink_to_fit(set* this) {
     assert(NULL);
