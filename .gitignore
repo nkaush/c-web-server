@@ -2,10 +2,10 @@
 .objs
 
 *_test
-# *-debug
+*-debug
 server
 client
-# main
+main
 
 # Prerequisites
 *.d
