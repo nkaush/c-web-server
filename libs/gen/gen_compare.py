@@ -10,32 +10,32 @@ int unsigned_long_compare(void *a, void *b);
 int unsigned_short_compare(void *a, void *b);"""
 
 sfmt = """{}
-    if ( !a && !b ) {}
+    if ( !a && !b ) {{
         return 0;
-    {} else if ( !a || !b ) {}
+    }} else if ( !a || !b ) {{
         return (!a) ? -1 : 1;
-    {}
+    }}
 
     return *(({}*) a) - *(({}*) b);
-{}
+}}
 """
 
 ufmt = """{}
-    if ( !a && !b ) {}
+    if ( !a && !b ) {{
         return 0;
-    {} else if ( !a || !b ) {}
+    }} else if ( !a || !b ) {{
         return (!a) ? -1 : 1;
-    {}
+    }}
 
     {} aa = *(({}*) a);
     {} bb = *(({}*) b);
 
-    if ( aa == bb ) {}
+    if ( aa == bb ) {{
         return 0;
-    {}
+    }}
 
     return aa < bb ? -1 : 1;
-{}
+}}
 """
 
 for header in headers.split('\n'):
@@ -44,6 +44,6 @@ for header in headers.split('\n'):
 
     signature = header.replace(';', ' {')
     if 'unsigned' not in dtype:
-        print(sfmt.format(signature, '{', '}', '{', '}', dtype, dtype, '}'))
+        print(sfmt.format(signature, dtype, dtype))
     else:
-        print(ufmt.format(signature, '{', '}', '{', '}', dtype, dtype, dtype, dtype, '{', '}', '}'))
+        print(ufmt.format(signature, dtype, dtype, dtype, dtype))

@@ -1,4 +1,5 @@
-#include "dictionary.h"
+#include "utils/dictionary.h"
+#include "utils/bitfield.h"
 #include <assert.h>
 
 #define NUM_PRIMES 38
@@ -28,6 +29,7 @@ struct dictionary {
     dict_node_t** nodes;
     dict_node_t* head;
     dict_node_t* tail;
+    bitfield* should_probe;
 
     copy_constructor_type value_copy_constructor;
     copy_constructor_type key_copy_constructor;
@@ -52,11 +54,10 @@ size_t find_next_prime(size_t target) {
 size_t dictionary_find_key(dictionary* this, void* elem) {
     size_t idx = this->hash_function(elem) % this->capacity;
     
-    while ( this->nodes[idx] ) {
-        // Slot is not empty, the key matches, and there is no tombstone
-        bool cmp = compare_equiv(this->comp, this->nodes[idx]->key, elem);
-
-        if (this->nodes[idx] != NULL && !cmp) {
+    while ( bitfield_get(this->should_probe, idx) ) {
+        // Slot is not empty, the key matches, and there is no tombstone        
+        if (this->nodes[idx] != NULL 
+                && !compare_equiv(this->comp, this->nodes[idx]->key, elem)) {
             return idx;
         }
             
@@ -74,7 +75,7 @@ void dictionary_free_all_nodes(dictionary* this) {
         curr = curr->next;
 
         this->value_destructor(prev->value);
-        this->key_destructor(prev->value);
+        this->key_destructor(prev->key);
         free(prev);
     }
 }
@@ -97,6 +98,7 @@ dictionary* dictionary_create(hash_function_type hash_function, compare comp,
     this->head = NULL;
     this->tail = NULL;
     this->capacity = find_next_prime(0);
+    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(dict_node_t*));
 
     this->value_copy_constructor = value_copy_constructor;
@@ -114,6 +116,7 @@ dictionary* dictionary_create(hash_function_type hash_function, compare comp,
 void dictionary_destroy(dictionary* this) {
     assert(this);
 
+    bitfield_destroy(this->should_probe);
     dictionary_free_all_nodes(this);
     free(this->nodes);
 
@@ -176,6 +179,7 @@ void dictionary_set_helper(dictionary* this, void* key, void* value) {
         ++this->size;
         this->tail = node;
         this->nodes[index] = node;
+        bitfield_set_true(this->should_probe, index);
     } // else the element already exists
 }
 
@@ -192,7 +196,9 @@ void dictionary_reserve(dictionary* this, size_t capacity) {
     #endif
 
     this->size = 0;
+    bitfield_destroy(this->should_probe);
     this->capacity = find_next_prime(capacity);
+    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(dict_node_t*));
 
     dict_node_t* curr = this->head;
@@ -261,6 +267,8 @@ void dictionary_clear(dictionary* this) {
     assert(this);
 
     dictionary_free_all_nodes(this);
+    bitfield_destroy(this->should_probe);
+    this->should_probe = bitfield_create(this->capacity);
 
     memset(this->nodes, 0, this->capacity * sizeof(dict_node_t*));
     this->head = NULL;

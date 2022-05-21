@@ -1,4 +1,6 @@
-#include "set.h"
+#include "utils/set.h"
+#include "utils/bitfield.h"
+
 #include <assert.h>
 #include <string.h>
 
@@ -27,6 +29,7 @@ struct set {
     set_node_t** nodes;
     set_node_t* head;
     set_node_t* tail;
+    bitfield* should_probe;
 
     hash_function_type hash;
     copy_constructor_type copy_constructor;
@@ -47,11 +50,10 @@ size_t find_prime(size_t target) {
 size_t set_find_key(set* this, void* elem) {
     size_t idx = this->hash(elem) % this->capacity;
     
-    while ( this->nodes[idx] ) {
-        // Slot is not empty, the key matches, and there is no tombstone
-        bool cmp = compare_equiv(this->comp, this->nodes[idx]->data, elem);
-
-        if (this->nodes[idx] != NULL && !cmp) {
+    while ( bitfield_get(this->should_probe, idx) ) {
+        // Slot is not empty, the key matches, and there is no tombstone        
+        if (this->nodes[idx] != NULL 
+                && !compare_equiv(this->comp, this->nodes[idx]->data, elem)) {
             return idx;
         }
             
@@ -97,6 +99,7 @@ set* set_create(hash_function_type hash_function,
     this->head = NULL;
     this->tail = NULL;
     this->capacity = find_prime(0);
+    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(set_node_t*));
     
     return this;
@@ -105,6 +108,7 @@ set* set_create(hash_function_type hash_function,
 void set_destroy(set* this) {
     assert(this);
 
+    bitfield_destroy(this->should_probe);
     set_free_all_nodes(this);
     free(this->nodes);
 
@@ -157,7 +161,21 @@ set* set_intersection(set* s, set* t) {
 }
 
 set* set_difference(set* s, set* t) {
-    assert(NULL);
+    assert(s);
+    assert(t);
+    
+    set* ret = set_create(
+        s->hash, s->comp, s->copy_constructor, s->destructor
+    );
+
+    set_node_t* curr = s->head;
+    while ( curr != NULL ) {
+        if ( !set_contains(t, curr->data) )
+            set_add(ret, curr->data);
+
+        curr = curr->next;
+    }
+
     return NULL;
 }
 
@@ -262,6 +280,7 @@ void set_add_helper(set* this, void* element) {
         ++this->size;
         this->tail = node;
         this->nodes[index] = node;
+        bitfield_set_true(this->should_probe, index);
     } // else the element already exists
 }
 
@@ -276,6 +295,7 @@ void set_add(set* this, void* element) {
 
 void set_remove(set* this, void* element) {
     assert(this);
+    assert(set_contains(this, element));
 
     size_t index = set_find_key(this, element);
     if ( this->nodes[index] != NULL ) {
@@ -307,6 +327,8 @@ void set_clear(set* this) {
     assert(this);
 
     set_free_all_nodes(this);
+    bitfield_destroy(this->should_probe);
+    this->should_probe = bitfield_create(this->capacity);
 
     memset(this->nodes, 0, this->capacity * sizeof(set_node_t*));
     this->head = NULL;
@@ -327,7 +349,9 @@ void set_reserve(set* this, size_t capacity) {
     #endif
 
     this->size = 0;
+    bitfield_destroy(this->should_probe);
     this->capacity = find_prime(capacity);
+    this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(set_node_t*));
 
     set_node_t* curr = this->head;

@@ -1,4 +1,4 @@
-#include "compare.h"
+#include "utils/compare.h"
 
 int shallow_compare(void *a, void *b) {
     if ( a == b ) {

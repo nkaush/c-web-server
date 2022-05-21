@@ -1,6 +1,10 @@
 .vscode
 .objs
 
+*_test
+server
+client
+
 # Prerequisites
 *.d
 
