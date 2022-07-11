@@ -7,6 +7,8 @@
 #include <time.h>
 #include <err.h>
 
+#include "common.h"
+
 void print_client_connected(char* addr, uint16_t port) {
     char time_buf[30];
     time_t now = time(NULL);
