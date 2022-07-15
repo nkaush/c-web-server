@@ -23,8 +23,6 @@
 static int kq_fd = 0;
 static int stop_server = 0;
 static int server_socket = 0;
-static set* server_files = NULL;
-static char* temp_directory = NULL;
 static dictionary* connections = NULL;
 static struct kevent* events_array = NULL;
 
@@ -112,24 +110,6 @@ void cleanup_server(void) {
     LOG("Exiting server...");
     if ( connections )
         dictionary_destroy(connections);
-
-    if ( server_files ) {
-        vector* filenames = set_elements(server_files);
-        for (size_t i = 0; i < vector_size(filenames); ++i) {
-            char* f = strdup((char*) vector_get(filenames, i));
-            delete_file_from_server(f); free(f);
-        }
-
-        vector_destroy(filenames);
-        set_destroy(server_files);
-    }
-
-    if ( temp_directory ) {
-        if ( rmdir(temp_directory) != 0 )
-            perror("rmdir");
-
-        free(temp_directory);
-    }
 
     if ( events_array ) 
         free(events_array);
@@ -267,6 +247,7 @@ int main(int argc, char** argv) {
     atexit(cleanup_server);
     setup_server_socket(argv[1]);
     print_server_details(argv[1]);
+    LOG(BOLDCYAN"Ready to accept connections..."RESET);
     setup_server_resources();
     
     kq_fd = kqueue();
@@ -298,6 +279,7 @@ int main(int argc, char** argv) {
                 
                 // connection_destroy(dictionary_get(connections, &fd));
                 // handle_client(events_array[i].ident, events_array[i].flags);
+                // dictionary_remove(connections, &this->client_fd);
             }
         }
     }

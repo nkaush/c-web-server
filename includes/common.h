@@ -29,6 +29,14 @@ typedef enum {
     V_UNKNOWN 
 } verb;
 
+// This enum indicates the state of a connection.
+typedef enum _connection_state {
+    CS_CLIENT_CONNECTED,
+    CS_HEADER_PARSED,
+    CS_REQUEST_RECEIVED,
+    CS_WRITING_RESPONSE
+} connection_state;
+
 /**
  * Attempts to read all count bytes from socket into buffer.
  * Assumes buffer is large enough.
