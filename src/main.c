@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "utils/callbacks.h"
+#include "format.h"
 
 #define NUM_VERBS 8
 
@@ -35,6 +36,9 @@ int main(int argc, char** argv) {
 
         token = strtok(NULL, s);
     }
+
+    fprintf(stderr, BOLDRED"test error\n");
+    printf("hello from stdout\n");
 
     return(0);
 }

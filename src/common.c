@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <err.h>
 
 #define BUFFER_SIZE 1024
 
@@ -135,6 +137,16 @@ char* robust_getline(int socket_fd) {
 
     vector_destroy(vec);
     return buffer;
+}
+
+void make_socket_non_blocking(int fd) {
+    // adapted from: https://github.com/eliben/code-for-blog/blob/master/2017/async-socket-server/utils.c
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+        err(EXIT_FAILURE, "fcntl F_GETFL");
+    
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) 
+        err(EXIT_FAILURE, "fcntl F_SETFL O_NONBLOCK");
 }
 
 int num_bytes_in_socket(int fd) {

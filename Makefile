@@ -25,10 +25,10 @@ LIBS_OBJS:=$(patsubst $(LIBS_SRC_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
 TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
-OBJS_COMMON =common.o format.o
-OBJS_CLIENT =$(EXE_CLIENT).o $(OBJS_COMMON) $(LIBS_OBJS)
-OBJS_SERVER =$(EXE_SERVER).o $(OBJS_COMMON) $(LIBS_OBJS)
-OBJS_MAIN   =$(EXE_MAIN).o $(LIBS_OBJS)
+OBJS_COMMON = common.o format.o
+OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_COMMON) $(LIBS_OBJS)
+OBJS_SERVER = $(EXE_SERVER).o $(OBJS_COMMON) $(LIBS_OBJS) connection.o
+OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_COMMON) $(LIBS_OBJS) 
 
 .PHONY: all
 all: release
@@ -47,7 +47,7 @@ print:
 .PHONY: debug
 .PHONY: test
 
-release: $(EXES_STUDENT)
+release: $(EXE_CLIENT) $(EXE_SERVER) $(TEST_EXES) $(EXE_MAIN)
 debug:   clean $(EXE_SERVER)-debug
 test: 	 $(TEST_EXES)
 
@@ -94,7 +94,7 @@ $(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(LIBS_OBJS:%.o=$(OBJS_DIR)/%-debug.o)
 
 .PHONY: clean
 clean:
-	rm -rf .objs $(TEST_EXES)
+	rm -rf .objs $(TEST_EXES) $(EXE_CLIENT) $(EXE_SERVER) $(EXE_CLIENT)-debug $(EXE_SERVER)-debug $(EXE_MAIN)
 
 build:
 	docker build -t neilk3/linux-dev-env .

@@ -1,5 +1,7 @@
 #include "utils/dictionary.h"
+#include "utils/callbacks.h"
 #include "utils/set.h"
+#include "connection.h"
 #include "common.h"
 #include "format.h"
 #include "server.h"
@@ -11,14 +13,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <netdb.h>
 #include <err.h>
 
 #define MAX_FILE_DESCRIPTORS 1024
-#define TIMEOUT_MS 1000
 
 static int kq_fd = 0;
 static int stop_server = 0;
@@ -27,51 +27,6 @@ static set* server_files = NULL;
 static char* temp_directory = NULL;
 static dictionary* connections = NULL;
 static struct kevent* events_array = NULL;
-
-connection_t* connection_init(int client_fd) {
-    connection_t* this = malloc(sizeof(connection_t));
-    this->state = CS_CLIENT_CONNECTED;
-    this->parsed_num_bytes = 0;
-    this->bytes_to_transmit = 0;
-    this->bytes_transmitted = 0;
-    this->v = -1;
-
-    this->buf = calloc(BUFFER_SIZE, sizeof(char));
-    this->buf_end = 0;
-    this->buf_ptr = 0;
-
-    this->filename = NULL;
-    this->f = NULL;
-
-    this->client_fd = client_fd;
-    dictionary_set(connections, &client_fd, this);
-    
-    struct kevent client_event;
-    EV_SET(&client_event, client_fd, EVFILT_READ | EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, NULL);
-
-    if ( kevent(kq_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
-        err(EXIT_FAILURE, "kevent register");
-    
-    if (client_event.flags & EV_ERROR)
-        errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
-
-    return this;
-}
-
-void connection_destroy(connection_t* this) {
-    if ( this->filename ) 
-        free(this->filename);
-
-    if ( this->buf )
-        free(this->buf);
-
-    if ( this->f )
-        fclose(this->f);
-
-    dictionary_remove(connections, &this->client_fd);
-    close(this->client_fd);
-    free(this);
-}
 
 char* make_path(char* filename) {
     char* ret = calloc(1, strlen(filename) + 8); 
@@ -91,16 +46,6 @@ void delete_file_from_server(char* filename) {
         perror("unlink");
 
     free(path);
-}
-
-void make_socket_non_blocking(int fd) {
-    // adapted from: https://github.com/eliben/code-for-blog/blob/master/2017/async-socket-server/utils.c
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1)
-        err(EXIT_FAILURE, "fcntl F_GETFL");
-    
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) 
-        err(EXIT_FAILURE, "fcntl F_SETFL O_NONBLOCK");
 }
 
 void setup_server_socket(char* port) {
@@ -129,16 +74,6 @@ void setup_server_socket(char* port) {
 
     freeaddrinfo(result);
 
-    // struct sockaddr_in addr;
-    // memset(&addr, 0, sizeof(addr));
-    // addr.sin_family = AF_INET;
-    // addr.sin_port = htons(atoi(port));
-    // addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    // printf("%d %d\n", htons(atoi(port)), atoi(port));
-
-    // bind(server_socket, (struct sockaddr*) &addr, sizeof(addr));
-
     if ( listen(server_socket, SOMAXCONN) ) 
         err(EXIT_FAILURE, "listen");
 
@@ -147,7 +82,12 @@ void setup_server_socket(char* port) {
 
 void setup_server_resources(void) {
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
-    connections = int_to_shallow_dictionary_create();
+    connections = dictionary_create(
+        int_hash_function, int_compare, 
+        int_copy_constructor, int_destructor,
+        connection_init, connection_destroy
+    );
+
     server_files = string_set_create();
     
     temp_directory = strdup("XXXXXX");
@@ -170,14 +110,8 @@ void setup_server_resources(void) {
 
 void cleanup_server(void) {
     LOG("Exiting server...");
-    if ( connections ) {
-        vector* values = dictionary_values(connections);
-        for (size_t i = 0; i < vector_size(values); ++i)
-            connection_destroy((connection_t*) vector_get(values, i));
-
+    if ( connections )
         dictionary_destroy(connections);
-        vector_destroy(values);
-    }
 
     if ( server_files ) {
         vector* filenames = set_elements(server_files);
@@ -222,7 +156,16 @@ int handle_new_client(void) {
 
         // LOG("\n(fd=%d) Accepted new connection", client_fd);
         make_socket_non_blocking(client_fd);
-        connection_init(client_fd);
+        dictionary_set(connections, &client_fd, &client_fd);
+    
+        struct kevent client_event;
+        EV_SET(&client_event, client_fd, EVFILT_READ | EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, NULL);
+
+        if ( kevent(kq_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
+            err(EXIT_FAILURE, "kevent register");
+        
+        if (client_event.flags & EV_ERROR)
+            errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
 
         char* client_addr_str = inet_ntoa(client_addr.sin_addr);
         uint16_t client_port = htons(client_addr.sin_port);
@@ -230,6 +173,86 @@ int handle_new_client(void) {
 
         return client_fd;
     }
+}
+
+void handle_client(int client_fd, struct kevent* event) {
+    connection_t* conn = dictionary_get(connections, &client_fd);
+    connection_read(conn);
+
+    if ( conn->state == CS_CLIENT_CONNECTED ) {
+        try_parse_verb(conn);
+    }
+    
+    if ( conn-> state == CS_VERB_PARSED ) {
+
+    }
+
+    if ( conn-> state == CS_REQUEST_PARSED ) {
+
+    }
+
+    if ( conn-> state == CS_HEADERS_PARSED ) {
+
+    }
+
+    if ( conn-> state == CS_REQUEST_RECEIVED ) {
+
+    }
+
+    if ( conn-> state == CS_WRITING_RESPONSE ) {
+
+    }
+}
+
+void try_parse_verb(connection_t* conn) {
+    size_t idx_space = 0;
+    for (size_t i = 3; i < 8; ++i) { // look for a space between index 3 and 8
+        if ( conn->buf[i] == ' ' ) {
+            idx_space = i; break;
+        }
+    }
+
+    if ( !idx_space ) {
+        conn->state = CS_REQUEST_RECEIVED;
+        conn->v = V_UNKNOWN;
+        return;
+    }
+
+    conn->buf[idx_space] = '\0';
+    size_t verb_hash = string_hash_function(conn->buf);
+    // hash the string value to avoid many calls to strncmp
+    // GET     --> 193456677
+    // HEAD    --> 6384105719
+    // POST    --> 6384404715
+    // PUT     --> 193467006
+    // DELETE  --> 6952134985656
+    // CONNECT --> 229419557091567
+    // OPTIONS --> 229435100789681
+    // TRACE   --> 210690186996
+
+    switch ( verb_hash ) {
+        case 193456677UL:
+            conn->v = V_GET; break;
+        case 6384105719UL:
+            conn->v = V_HEAD; break;
+        case 6384404715UL:
+            conn->v = V_POST; break;
+        case 193467006UL:
+            conn->v = V_PUT; break;
+        case 6952134985656UL:
+            conn->v = V_DELETE; break;
+        case 229419557091567UL:
+            conn->v = V_CONNECT; break;
+        case 229435100789681UL:
+            conn->v = V_OPTIONS; break;
+        case 210690186996UL:
+            conn->v = V_TRACE; break;
+        default:
+            conn->v = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
+    }
+
+    conn->state = CS_VERB_PARSED;
+    conn->buf_ptr = idx_space + 1;
 }
 
 void handle_sigint(int signal) { (void)signal; stop_server = 1; }
@@ -265,11 +288,14 @@ int main(int argc, char** argv) {
 
         for(int i = 0 ; i < num_events; i++) {
             int fd = events_array[i].ident;
-            
+            events_array[i].
             if (fd == server_socket) { 
                 // we have a new connection to the server
                 handle_new_client();
             } else if (fd > 0) {
+                handle_client(fd, events_array + i);
+
+                
                 // connection_destroy(dictionary_get(connections, &fd));
                 // handle_client(events_array[i].ident, events_array[i].flags);
             }

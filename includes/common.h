@@ -19,9 +19,13 @@
 
 typedef enum { 
     V_GET, 
+    V_HEAD,
+    V_POST,
     V_PUT, 
-    V_DELETE, 
-    V_LIST, 
+    V_DELETE,
+    V_CONNECT,
+    V_OPTIONS,
+    V_TRACE, 
     V_UNKNOWN 
 } verb;
 
@@ -75,6 +79,9 @@ ssize_t buffered_write_to_socket(int socket_fd, FILE* in, size_t count);
  * allocated to a string on the heap.
  */
 char* robust_getline(int socket);
+
+// Use the fcntl interface to make the specified socket non-blocking.
+void make_socket_non_blocking(int fd);
 
 /**
  * @brief Check if a socket has bytes to read.
