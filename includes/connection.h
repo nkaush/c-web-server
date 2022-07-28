@@ -1,5 +1,4 @@
 #pragma once
-#include <stdio.h>
 #include <time.h>
 #include "common.h"
 #include "request.h"

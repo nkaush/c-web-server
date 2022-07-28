@@ -1,6 +1,7 @@
 #include "common.h"
 #include "utils/vector.h"
 
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>

@@ -1,7 +1,4 @@
 #pragma once
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <stddef.h>
 #include <stdio.h>
 
 #define MIN(x, y) (x < y ? x : y)
