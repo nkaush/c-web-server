@@ -1,22 +1,22 @@
 #pragma once
 #include "libs/dictionary.h"
 
-typedef enum _verb { 
-    V_GET,
-    V_HEAD,
-    V_POST,
-    V_PUT,
-    V_DELETE,
-    V_CONNECT,
-    V_OPTIONS,
-    V_TRACE, 
-    V_UNKNOWN = -1
-} verb;
+typedef enum _http_method { 
+    HTTP_GET,
+    HTTP_HEAD,
+    HTTP_POST,
+    HTTP_PUT,
+    HTTP_DELETE,
+    HTTP_CONNECT,
+    HTTP_OPTIONS,
+    HTTP_TRACE, 
+    HTTP_UNKNOWN = -1
+} http_method;
 
 typedef struct _request {
-    verb request_method; 
-    char* path;
+    http_method request_method; 
     dictionary* headers; // a dictionary of (char*) -> (char*) 
     dictionary* params;  // a dictionary of (char*) -> (char*) 
+    char* path;
     char* body;
 } request_t;

@@ -78,7 +78,7 @@ void connection_try_parse_verb(connection_t* conn) {
 
     if ( !idx_space ) {
         conn->state = CS_REQUEST_RECEIVED;
-        conn->request_method = V_UNKNOWN;
+        conn->request_method = HTTP_UNKNOWN;
         return;
     }
 
@@ -96,23 +96,23 @@ void connection_try_parse_verb(connection_t* conn) {
 
     switch ( verb_hash ) {
         case 193456677UL:
-            conn->request_method = V_GET; break;
+            conn->request_method = HTTP_GET; break;
         case 6384105719UL:
-            conn->request_method = V_HEAD; break;
+            conn->request_method = HTTP_HEAD; break;
         case 6384404715UL:
-            conn->request_method = V_POST; break;
+            conn->request_method = HTTP_POST; break;
         case 193467006UL:
-            conn->request_method = V_PUT; break;
+            conn->request_method = HTTP_PUT; break;
         case 6952134985656UL:
-            conn->request_method = V_DELETE; break;
+            conn->request_method = HTTP_DELETE; break;
         case 229419557091567UL:
-            conn->request_method = V_CONNECT; break;
+            conn->request_method = HTTP_CONNECT; break;
         case 229435100789681UL:
-            conn->request_method = V_OPTIONS; break;
+            conn->request_method = HTTP_OPTIONS; break;
         case 210690186996UL:
-            conn->request_method = V_TRACE; break;
+            conn->request_method = HTTP_TRACE; break;
         default:
-            conn->request_method = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
+            conn->request_method = HTTP_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
     }
 
     conn->state = CS_VERB_PARSED;

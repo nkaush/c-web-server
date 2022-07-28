@@ -25,7 +25,7 @@ typedef struct _connection {
     int client_fd;
     int buf_end;
     int buf_ptr;
-    verb request_method;
+    http_method request_method;
 } connection_t;
 
 // Initialize a connection data structure and save to the global connections 
@@ -40,7 +40,7 @@ void connection_read(connection_t* conn);
 
 void connection_shift_buffer(connection_t* conn);
 
-// Attempt to parse the verb in a header received from a client.
+// Attempt to parse the http_method in a header received from a client.
 void connection_try_parse_verb(connection_t* conn);
 
 // Attempt to parse the header received from a client.
