@@ -27,7 +27,7 @@ TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
 OBJS_COMMON = common.o format.o
 OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_COMMON) $(LIBS_OBJS)
-OBJS_SERVER = $(EXE_SERVER).o $(OBJS_COMMON) $(LIBS_OBJS) connection.o
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_COMMON) $(LIBS_OBJS) server.o connection.o request.o
 OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_COMMON) $(LIBS_OBJS) 
 
 .PHONY: all

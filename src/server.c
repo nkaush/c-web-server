@@ -1,6 +1,5 @@
 #include "utils/dictionary.h"
 #include "utils/callbacks.h"
-#include "utils/set.h"
 #include "connection.h"
 #include "common.h"
 #include "format.h"
@@ -9,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/event.h>
 #include <arpa/inet.h>
-#include <sys/stat.h>
+// #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
@@ -23,10 +22,12 @@
 static int kq_fd = 0;
 static int stop_server = 0;
 static int server_socket = 0;
+static int was_server_initialized = 0;
 static dictionary* connections = NULL;
 static struct kevent* events_array = NULL;
 
-void setup_server_socket(char* port) {
+// Configure the server socket.
+void server_setup_socket(char* port) {
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
     int opt = 1;
@@ -58,7 +59,14 @@ void setup_server_socket(char* port) {
     make_socket_non_blocking(server_socket);
 }
 
-void setup_server_resources(void) {
+// Gracefully capture SIGINT and stop the server.
+void handle_sigint(int signal) { (void)signal; stop_server = 1; }
+
+// Gracefully capture SIGPIPE and do nothing.
+void handle_sigpipe(int signal) { (void)signal; }
+
+// Configure the server's resources.
+void server_setup_resources(void) {
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
     connections = dictionary_create(
         int_hash_function, int_compare, 
@@ -80,18 +88,8 @@ void setup_server_resources(void) {
         err(EXIT_FAILURE, "sigaction SIGPIPE");
 }
 
-void cleanup_server(void) {
-    LOG("Exiting server...");
-    if ( connections )
-        dictionary_destroy(connections);
-
-    if ( events_array ) 
-        free(events_array);
-   
-    close(server_socket);
-}
-
-int handle_new_client(void) {
+// Handle an kqueue event triggered from a client requesting to connect.
+int server_handle_new_client(void) {
     struct sockaddr_in client_addr = { 0 };
     socklen_t len = sizeof(client_addr);
     int client_fd = accept(server_socket, (struct sockaddr*) &client_addr, &len);
@@ -128,12 +126,13 @@ int handle_new_client(void) {
     }
 }
 
-void handle_client(int client_fd, struct kevent* event) {
+// Handle an kqueue event from a client connection.
+void server_handle_client(int client_fd, struct kevent* event) {
     connection_t* conn = dictionary_get(connections, &client_fd);
     connection_read(conn);
 
     if ( conn->state == CS_CLIENT_CONNECTED ) {
-        try_parse_verb(conn);
+        connection_try_parse_verb(conn);
     }
     
     if ( conn-> state == CS_VERB_PARSED ) {
@@ -159,72 +158,29 @@ void handle_client(int client_fd, struct kevent* event) {
     }
 }
 
-void try_parse_verb(connection_t* conn) {
-    size_t idx_space = 0;
-    for (size_t i = 3; i < 8; ++i) { // look for a space between index 3 and 8
-        if ( conn->buf[i] == ' ' ) {
-            idx_space = i; break;
-        }
-    }
+// Cleanup the resources used by the server. Called on program exit.
+void server_cleanup(void) {
+    LOG("Exiting server...");
+    if ( connections )
+        dictionary_destroy(connections);
 
-    if ( !idx_space ) {
-        conn->state = CS_REQUEST_RECEIVED;
-        conn->v = V_UNKNOWN;
-        return;
-    }
-
-    conn->buf[idx_space] = '\0';
-    size_t verb_hash = string_hash_function(conn->buf);
-    // hash the string value to avoid many calls to strncmp
-    // GET     --> 193456677
-    // HEAD    --> 6384105719
-    // POST    --> 6384404715
-    // PUT     --> 193467006
-    // DELETE  --> 6952134985656
-    // CONNECT --> 229419557091567
-    // OPTIONS --> 229435100789681
-    // TRACE   --> 210690186996
-
-    switch ( verb_hash ) {
-        case 193456677UL:
-            conn->v = V_GET; break;
-        case 6384105719UL:
-            conn->v = V_HEAD; break;
-        case 6384404715UL:
-            conn->v = V_POST; break;
-        case 193467006UL:
-            conn->v = V_PUT; break;
-        case 6952134985656UL:
-            conn->v = V_DELETE; break;
-        case 229419557091567UL:
-            conn->v = V_CONNECT; break;
-        case 229435100789681UL:
-            conn->v = V_OPTIONS; break;
-        case 210690186996UL:
-            conn->v = V_TRACE; break;
-        default:
-            conn->v = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
-    }
-
-    conn->state = CS_VERB_PARSED;
-    conn->buf_ptr = idx_space + 1;
+    if ( events_array ) 
+        free(events_array);
+   
+    close(server_socket);
 }
 
-void handle_sigint(int signal) { (void)signal; stop_server = 1; }
-
-void handle_sigpipe(int signal) { (void)signal; }
-
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        errx(EXIT_FAILURE, "./server <port>");
+void server_init(char* port) {
+    if ( was_server_initialized ) {
+        errx(EXIT_FAILURE, "Cannot initialize server twice.");
     }
 
-    atexit(cleanup_server);
-    setup_server_socket(argv[1]);
-    print_server_details(argv[1]);
-    setup_server_resources();
-    print_server_ready();
-    
+    was_server_initialized = 1;
+    atexit(server_cleanup);
+    server_setup_socket(port);
+    print_server_details(port);
+    server_setup_resources();
+
     kq_fd = kqueue();
     if (kq_fd == -1)
         err(EXIT_FAILURE, "kqueue");
@@ -236,6 +192,10 @@ int main(int argc, char** argv) {
         err(EXIT_FAILURE, "kevent register");
     if (accept_event.flags & EV_ERROR)
         errx(EXIT_FAILURE, "Event error: %s", strerror(accept_event.data));
+}
+
+void server_launch(void) {
+    print_server_ready();
 
     int num_events = 0;
     while ( !stop_server ) {
@@ -247,17 +207,15 @@ int main(int argc, char** argv) {
             // events_array[i].data;
             if (fd == server_socket) { 
                 // we have a new connection to the server
-                handle_new_client();
+                server_handle_new_client();
             } else if (fd > 0) {
-                handle_client(fd, events_array + i);
+                server_handle_client(fd, events_array + i);
 
                 
                 // connection_destroy(dictionary_get(connections, &fd));
-                // handle_client(events_array[i].ident, events_array[i].flags);
+                // server_handle_client(events_array[i].ident, events_array[i].flags);
                 // dictionary_remove(connections, &this->client_fd);
             }
         }
     }
-
-    exit(0);
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "common.h"
+#include "request.h"
 
 // This enum indicates the state of a connection.
 typedef enum _connection_state {
@@ -39,3 +40,9 @@ void connection_destroy(void* ptr);
 void connection_read(connection_t* conn);
 
 void connection_shift_buffer(connection_t* conn);
+
+// Attempt to parse the verb in a header received from a client.
+void connection_try_parse_verb(connection_t* conn);
+
+// Attempt to parse the header received from a client.
+void connection_try_parse_header(connection_t* conn);

@@ -25,18 +25,6 @@
         fprintf(stderr, "\n");        \
     } while (0);
 
-typedef enum { 
-    V_GET, 
-    V_HEAD,
-    V_POST,
-    V_PUT, 
-    V_DELETE,
-    V_CONNECT,
-    V_OPTIONS,
-    V_TRACE, 
-    V_UNKNOWN 
-} verb;
-
 /**
  * Attempts to read all count bytes from socket into buffer.
  * Assumes buffer is large enough.

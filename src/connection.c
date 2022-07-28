@@ -67,3 +67,54 @@ void connection_shift_buffer(connection_t* conn) {
     conn->buf_end -= conn->buf_ptr;
     conn->buf_ptr = 0;
 }
+
+void connection_try_parse_verb(connection_t* conn) {
+    size_t idx_space = 0;
+    for (size_t i = 3; i < 8; ++i) { // look for a space between index 3 and 8
+        if ( conn->buf[i] == ' ' ) {
+            idx_space = i; break;
+        }
+    }
+
+    if ( !idx_space ) {
+        conn->state = CS_REQUEST_RECEIVED;
+        conn->v = V_UNKNOWN;
+        return;
+    }
+
+    conn->buf[idx_space] = '\0';
+    size_t verb_hash = string_hash_function(conn->buf);
+    // hash the string value to avoid many calls to strncmp
+    // GET     --> 193456677
+    // HEAD    --> 6384105719
+    // POST    --> 6384404715
+    // PUT     --> 193467006
+    // DELETE  --> 6952134985656
+    // CONNECT --> 229419557091567
+    // OPTIONS --> 229435100789681
+    // TRACE   --> 210690186996
+
+    switch ( verb_hash ) {
+        case 193456677UL:
+            conn->v = V_GET; break;
+        case 6384105719UL:
+            conn->v = V_HEAD; break;
+        case 6384404715UL:
+            conn->v = V_POST; break;
+        case 193467006UL:
+            conn->v = V_PUT; break;
+        case 6952134985656UL:
+            conn->v = V_DELETE; break;
+        case 229419557091567UL:
+            conn->v = V_CONNECT; break;
+        case 229435100789681UL:
+            conn->v = V_OPTIONS; break;
+        case 210690186996UL:
+            conn->v = V_TRACE; break;
+        default:
+            conn->v = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
+    }
+
+    conn->state = CS_VERB_PARSED;
+    conn->buf_ptr = idx_space + 1;
+}
