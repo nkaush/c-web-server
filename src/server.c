@@ -1,5 +1,5 @@
-#include "types/dictionary.h"
-#include "types/callbacks.h"
+#include "libs/dictionary.h"
+#include "libs/callbacks.h"
 #include "internals/connection.h"
 #include "internals/common.h"
 #include "internals/format.h"
@@ -135,7 +135,7 @@ void server_handle_client(int client_fd, struct kevent* event) {
     }
     
     if ( conn-> state == CS_VERB_PARSED ) {
-        LOG("%d", conn->v);
+        LOG("%d", conn->request_method);
         LOG("%s", conn->buf);
         LOG("[%s]", conn->buf + conn->buf_ptr);
     }

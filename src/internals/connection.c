@@ -15,7 +15,7 @@ void* connection_init(void* ptr) {
     this->parsed_num_bytes = 0;
     this->bytes_to_transmit = 0;
     this->bytes_transmitted = 0;
-    this->v = -1;
+    this->request_method = -1;
 
     clock_gettime(CLOCK_REALTIME, &this->time_received);
 
@@ -78,7 +78,7 @@ void connection_try_parse_verb(connection_t* conn) {
 
     if ( !idx_space ) {
         conn->state = CS_REQUEST_RECEIVED;
-        conn->v = V_UNKNOWN;
+        conn->request_method = V_UNKNOWN;
         return;
     }
 
@@ -96,23 +96,23 @@ void connection_try_parse_verb(connection_t* conn) {
 
     switch ( verb_hash ) {
         case 193456677UL:
-            conn->v = V_GET; break;
+            conn->request_method = V_GET; break;
         case 6384105719UL:
-            conn->v = V_HEAD; break;
+            conn->request_method = V_HEAD; break;
         case 6384404715UL:
-            conn->v = V_POST; break;
+            conn->request_method = V_POST; break;
         case 193467006UL:
-            conn->v = V_PUT; break;
+            conn->request_method = V_PUT; break;
         case 6952134985656UL:
-            conn->v = V_DELETE; break;
+            conn->request_method = V_DELETE; break;
         case 229419557091567UL:
-            conn->v = V_CONNECT; break;
+            conn->request_method = V_CONNECT; break;
         case 229435100789681UL:
-            conn->v = V_OPTIONS; break;
+            conn->request_method = V_OPTIONS; break;
         case 210690186996UL:
-            conn->v = V_TRACE; break;
+            conn->request_method = V_TRACE; break;
         default:
-            conn->v = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
+            conn->request_method = V_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
     }
 
     conn->state = CS_VERB_PARSED;

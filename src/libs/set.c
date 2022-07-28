@@ -1,5 +1,5 @@
-#include "types/set.h"
-#include "types/bitfield.h"
+#include "libs/set.h"
+#include "libs/bitfield.h"
 
 #include <assert.h>
 #include <string.h>

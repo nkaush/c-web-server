@@ -25,7 +25,7 @@ typedef struct _connection {
     int client_fd;
     int buf_end;
     int buf_ptr;
-    verb v;
+    verb request_method;
 } connection_t;
 
 // Initialize a connection data structure and save to the global connections 

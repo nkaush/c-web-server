@@ -1,5 +1,5 @@
 #pragma once
-#include "types/dictionary.h"
+#include "libs/dictionary.h"
 
 typedef enum _verb { 
     V_GET,
