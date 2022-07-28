@@ -26,26 +26,6 @@ static int server_socket = 0;
 static dictionary* connections = NULL;
 static struct kevent* events_array = NULL;
 
-char* make_path(char* filename) {
-    char* ret = calloc(1, strlen(filename) + 8); 
-    strcpy(ret, temp_directory);
-    strcat(ret, "/");
-    strcat(ret, filename);
-
-    return ret;  // path = directory + '/' + filename + '\0'
-}
-
-void delete_file_from_server(char* filename) {
-    if ( set_contains(server_files, filename) ) // some defensive programming...
-        set_remove(server_files, filename);
-
-    char* path = make_path(filename);
-    if ( unlink(path) != 0 )
-        perror("unlink");
-
-    free(path);
-}
-
 void setup_server_socket(char* port) {
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -85,12 +65,6 @@ void setup_server_resources(void) {
         int_copy_constructor, int_destructor,
         connection_init, connection_destroy
     );
-
-    server_files = string_set_create();
-    
-    temp_directory = strdup("XXXXXX");
-    mkdtemp(temp_directory);
-    LOG("Storing files at '%s'", temp_directory);
 
     struct sigaction sigint_action, sigpipe_action;
     memset(&sigint_action, 0, sizeof(sigint_action));
@@ -269,7 +243,7 @@ int main(int argc, char** argv) {
 
         for(int i = 0 ; i < num_events; i++) {
             int fd = events_array[i].ident;
-            events_array[i].
+            // events_array[i].data;
             if (fd == server_socket) { 
                 // we have a new connection to the server
                 handle_new_client();

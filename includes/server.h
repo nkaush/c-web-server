@@ -1,15 +1,9 @@
 #pragma once
+#include <sys/event.h>
 #include <stdio.h>
 #include <time.h>
 #include "connection.h"
 #include "common.h"
-
-// Construct a path for the specified file using the server files directory.
-// Allocates data on the heap for the returned path.l
-char* make_path(char* filename);
-
-// Deletes the specified file from the server.
-void delete_file_from_server(char* filename);
 
 // Configure the server socket.
 void setup_server_socket(char* port);
