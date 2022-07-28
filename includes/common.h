@@ -7,15 +7,23 @@
 #define MIN(x, y) (x < y ? x : y)
 #define MAX(x, y) (x > y ? x : y)
 
-#ifdef DEBUG
+// #ifdef DEBUG
+// #define LOG(...)                      \
+//     do {                              \
+//         fprintf(stderr, "[DEBUG] "); \
+//         fprintf(stderr, __VA_ARGS__); \
+//         fprintf(stderr, "\n");        \
+//     } while (0);
+// #else
+// #define LOG(...) 
+// #endif
+
 #define LOG(...)                      \
     do {                              \
+        fprintf(stderr, "[DEBUG] "); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n");        \
     } while (0);
-#else
-#define LOG(...) 
-#endif
 
 typedef enum { 
     V_GET, 

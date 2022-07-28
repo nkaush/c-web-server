@@ -108,7 +108,6 @@ int handle_new_client(void) {
         if (client_fd >= MAX_FILE_DESCRIPTORS) 
             errx(EXIT_FAILURE, "client_fd (%d) >= MAX_FILE_DESCRIPTORS (%d)", client_fd, MAX_FILE_DESCRIPTORS);
 
-        // LOG("\n(fd=%d) Accepted new connection", client_fd);
         make_socket_non_blocking(client_fd);
         dictionary_set(connections, &client_fd, &client_fd);
     
@@ -138,7 +137,9 @@ void handle_client(int client_fd, struct kevent* event) {
     }
     
     if ( conn-> state == CS_VERB_PARSED ) {
-
+        LOG("%d", conn->v);
+        LOG("%s", conn->buf);
+        LOG("[%s]", conn->buf + conn->buf_ptr);
     }
 
     if ( conn-> state == CS_REQUEST_PARSED ) {
@@ -221,8 +222,8 @@ int main(int argc, char** argv) {
     atexit(cleanup_server);
     setup_server_socket(argv[1]);
     print_server_details(argv[1]);
-    LOG(BOLDCYAN"Ready to accept connections..."RESET);
     setup_server_resources();
+    print_server_ready();
     
     kq_fd = kqueue();
     if (kq_fd == -1)

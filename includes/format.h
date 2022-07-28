@@ -21,8 +21,10 @@
 #define BOLDCYAN    "\033[1m\033[36m"      // Bold Cyan
 #define BOLDWHITE   "\033[1m\033[37m"      // Bold White
 
-static const char* time_fmt = "%a, %d %b %Y %H:%M:%S %Z";
+static const char* time_fmt = "%d %b %Y %H:%M:%S %Z";
 
 void print_client_connected(char* addr, uint16_t port);
 
 void print_server_details(char* port);
+
+void print_server_ready(void);

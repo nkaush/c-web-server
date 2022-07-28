@@ -42,3 +42,7 @@ void print_server_details(char* port) {
         host_buffer, ip_buffer, port
     );
 }
+
+void print_server_ready(void) {
+    printf(BOLDCYAN"Ready to accept connections..."RESET"\n");
+}
