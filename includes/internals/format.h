@@ -1,5 +1,6 @@
 #pragma once
 #include <stdlib.h>
+#include <stdio.h>
 
 // Constants used to print in color to the command line
 // Adapted from https://stackoverflow.com/a/9158263
@@ -20,6 +21,31 @@
 #define BOLDMAGENTA "\033[1m\033[35m"      // Bold Magenta
 #define BOLDCYAN    "\033[1m\033[36m"      // Bold Cyan
 #define BOLDWHITE   "\033[1m\033[37m"      // Bold White
+
+// #ifdef DEBUG
+// #define LOG(...)                      \
+//     do {                              \
+//         fprintf(stderr, "[DEBUG] "); \
+//         fprintf(stderr, __VA_ARGS__); \
+//         fprintf(stderr, "\n");        \
+//     } while (0);
+// #else
+// #define LOG(...) 
+// #endif
+
+#define LOG(...)                      \
+    do {                              \
+        fprintf(stderr, "[DEBUG] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n");        \
+    } while (0);
+
+#define WARN(...)                      \
+    do {                              \
+        fprintf(stderr, BOLDRED"[WARN] "); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n"RESET);        \
+    } while (0);
 
 static const char* time_fmt = "%d %b %Y %H:%M:%S %Z";
 

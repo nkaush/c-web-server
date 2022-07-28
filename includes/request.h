@@ -1,6 +1,8 @@
 #pragma once
 #include "libs/dictionary.h"
 
+#define NUM_HTTP_METHODS 8
+
 typedef enum _http_method { 
     HTTP_GET,
     HTTP_HEAD,
@@ -20,3 +22,5 @@ typedef struct _request {
     char* path;
     char* body;
 } request_t;
+
+char* http_method_to_string(http_method method);

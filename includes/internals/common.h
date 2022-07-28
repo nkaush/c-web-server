@@ -4,24 +4,6 @@
 #define MIN(x, y) (x < y ? x : y)
 #define MAX(x, y) (x > y ? x : y)
 
-// #ifdef DEBUG
-// #define LOG(...)                      \
-//     do {                              \
-//         fprintf(stderr, "[DEBUG] "); \
-//         fprintf(stderr, __VA_ARGS__); \
-//         fprintf(stderr, "\n");        \
-//     } while (0);
-// #else
-// #define LOG(...) 
-// #endif
-
-#define LOG(...)                      \
-    do {                              \
-        fprintf(stderr, "[DEBUG] "); \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "\n");        \
-    } while (0);
-
 /**
  * Attempts to read all count bytes from socket into buffer.
  * Assumes buffer is large enough.

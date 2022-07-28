@@ -1,4 +1,5 @@
 #include "internals/common.h"
+#include "internals/format.h"
 #include "libs/vector.h"
 
 #include <sys/ioctl.h>

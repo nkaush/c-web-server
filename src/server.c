@@ -22,7 +22,10 @@ static int kq_fd = 0;
 static int stop_server = 0;
 static int server_socket = 0;
 static int was_server_initialized = 0;
+
+static dictionary* routes = NULL;
 static dictionary* connections = NULL;
+
 static struct kevent* events_array = NULL;
 
 // Configure the server socket.
@@ -64,6 +67,11 @@ void handle_sigint(int signal) { (void)signal; stop_server = 1; }
 // Gracefully capture SIGPIPE and do nothing.
 void handle_sigpipe(int signal) { (void)signal; }
 
+void* allocate_handler_array(void* ptr) {
+    (void)ptr;
+    return calloc(NUM_HTTP_METHODS, sizeof(request_handler_t));
+}
+
 // Configure the server's resources.
 void server_setup_resources(void) {
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
@@ -71,6 +79,12 @@ void server_setup_resources(void) {
         int_hash_function, int_compare, 
         int_copy_constructor, int_destructor,
         connection_init, connection_destroy
+    );
+
+    routes = dictionary_create(
+        string_hash_function, string_compare,
+        string_copy_constructor, string_destructor, 
+        allocate_handler_array, free
     );
 
     struct sigaction sigint_action, sigpipe_action;
@@ -163,16 +177,21 @@ void server_cleanup(void) {
     if ( connections )
         dictionary_destroy(connections);
 
+    if ( routes )
+        dictionary_destroy(routes);
+
     if ( events_array ) 
         free(events_array);
-   
+    
     close(server_socket);
 }
 
 void server_init(char* port) {
-    if ( was_server_initialized ) {
-        errx(EXIT_FAILURE, "Cannot initialize server twice.");
-    }
+    if ( was_server_initialized )
+        errx(EXIT_FAILURE, "Cannot initialize server twice");
+
+    else if ( !port ) 
+        errx(EXIT_FAILURE, "Cannot bind to NULL port");
 
     was_server_initialized = 1;
     atexit(server_cleanup);
@@ -217,4 +236,22 @@ void server_launch(void) {
             }
         }
     }
+}
+
+void server_register_route(http_method method, char* route, request_handler_t handler) {
+    if ( method == HTTP_UNKNOWN )
+        errx(EXIT_FAILURE, "Cannot register handler for HTTP_UNKNOWN");
+    else if ( !route ) 
+        errx(EXIT_FAILURE, "Cannot register handler for NULL route");
+    else if ( !handler )
+        errx(EXIT_FAILURE, "Cannot register handler for NULL handler");
+
+    if ( !dictionary_contains(routes, route) )
+        dictionary_set(routes, route, NULL);
+
+    request_handler_t* method_array = dictionary_get(routes, route);
+    if ( method_array[(size_t) method] )
+        WARN("Redefinition of route '%s %s'", http_method_to_string(method), route);
+
+    method_array[(size_t) method] = handler;
 }

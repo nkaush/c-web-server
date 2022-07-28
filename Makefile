@@ -31,7 +31,7 @@ TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
 OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_INTERNAL) $(OBJS_LIBS)
-OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) server.o
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) server.o request.o response.o
 OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_INTERNAL) $(OBJS_LIBS) 
 
 .PHONY: all
