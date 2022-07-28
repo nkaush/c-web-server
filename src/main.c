@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "utils/callbacks.h"
-#include "format.h"
+#include "types/callbacks.h"
+#include "internals/format.h"
 
 #define NUM_VERBS 8
 

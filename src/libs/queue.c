@@ -1,4 +1,4 @@
-#include "utils/queue.h"
+#include "types/queue.h"
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>

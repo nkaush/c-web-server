@@ -1,6 +1,7 @@
-#include "utils/dictionary.h"
+#pragma once
+#include "types/dictionary.h"
 
-typedef enum { 
+typedef enum _verb { 
     V_GET,
     V_HEAD,
     V_POST,

@@ -1,6 +1,6 @@
 #pragma once
 #include <time.h>
-#include "common.h"
+#include "internals/common.h"
 #include "request.h"
 
 // This enum indicates the state of a connection.

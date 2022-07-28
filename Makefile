@@ -1,7 +1,8 @@
 OBJS_DIR     = .objs
 TEST_DIR     = tests
 SRC_DIR      = src
-LIBS_SRC_DIR = libs
+LIBS_SRC_DIR = $(SRC_DIR)/libs
+INTERNALS_SRC_DIR = $(SRC_DIR)/internals
 
 EXE_SERVER = server
 EXE_CLIENT = client
@@ -20,15 +21,18 @@ CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 
 # Find object files for libraries
 LIBS_SRC_FILES:=$(wildcard $(LIBS_SRC_DIR)/*.c)
-LIBS_OBJS:=$(patsubst $(LIBS_SRC_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
+OBJS_LIBS:=$(patsubst $(LIBS_SRC_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
+
+# Find object files for internals
+INTERNALS_SRC_FILES:=$(wildcard $(INTERNALS_SRC_DIR)/*.c)
+OBJS_INTERNAL:=$(patsubst $(INTERNALS_SRC_DIR)/%.c,%.o,$(INTERNALS_SRC_FILES))
 
 TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
-OBJS_COMMON = common.o format.o
-OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_COMMON) $(LIBS_OBJS)
-OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_COMMON) $(LIBS_OBJS) server.o connection.o request.o
-OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_COMMON) $(LIBS_OBJS) 
+OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_INTERNAL) $(OBJS_LIBS)
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) server.o
+OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_INTERNAL) $(OBJS_LIBS) 
 
 .PHONY: all
 all: release
@@ -68,6 +72,13 @@ $(OBJS_DIR)/%-debug.o: $(LIBS_SRC_DIR)/%.c | $(OBJS_DIR)
 $(OBJS_DIR)/%-release.o: $(LIBS_SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
+# Define rules to compile object files for internals
+$(OBJS_DIR)/%-debug.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
+	$(CC) $(CFLAGS_DEBUG) $< -o $@
+
+$(OBJS_DIR)/%-release.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
+	$(CC) $(CFLAGS_RELEASE) $< -o $@
+
 # Define rules to compile object files for tests
 $(OBJS_DIR)/%-debug.o: $(TEST_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
@@ -89,7 +100,7 @@ $(EXE_MAIN): $(OBJS_MAIN:%.o=$(OBJS_DIR)/%-debug.o)
 	$(LD) $^ -o $@
 
 # Rules to link test executables
-$(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(LIBS_OBJS:%.o=$(OBJS_DIR)/%-debug.o)
+$(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_LIBS:%.o=$(OBJS_DIR)/%-debug.o)
 	$(LD) $^ -o $(notdir $@)
 
 .PHONY: clean

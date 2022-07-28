@@ -1,8 +1,8 @@
-#include "utils/dictionary.h"
-#include "utils/callbacks.h"
-#include "connection.h"
-#include "common.h"
-#include "format.h"
+#include "types/dictionary.h"
+#include "types/callbacks.h"
+#include "internals/connection.h"
+#include "internals/common.h"
+#include "internals/format.h"
 #include "server.h"
 
 #include <sys/socket.h>

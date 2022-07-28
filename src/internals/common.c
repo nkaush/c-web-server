@@ -1,5 +1,5 @@
-#include "common.h"
-#include "utils/vector.h"
+#include "internals/common.h"
+#include "types/vector.h"
 
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -141,7 +141,7 @@ char* robust_getline(int socket_fd) {
 }
 
 void make_socket_non_blocking(int fd) {
-    // adapted from: https://github.com/eliben/code-for-blog/blob/master/2017/async-socket-server/utils.c
+    // adapted from: https://github.com/eliben/code-for-blog/blob/master/2017/async-socket-server/types.c
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1)
         err(EXIT_FAILURE, "fcntl F_GETFL");

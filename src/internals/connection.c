@@ -1,4 +1,4 @@
-#include "connection.h"
+#include "internals/connection.h"
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>

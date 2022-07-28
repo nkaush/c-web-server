@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <netdb.h>
 
-#include "common.h"
+#include "internals/common.h"
 
 int setup_client(char* host, char* port) {
     struct addrinfo hints, *res;

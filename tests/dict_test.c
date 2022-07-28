@@ -1,4 +1,4 @@
-#include "utils/dictionary.h"
+#include "types/dictionary.h"
 
 #include <assert.h>
 #include <stdio.h>

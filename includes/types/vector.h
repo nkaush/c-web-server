@@ -1,5 +1,5 @@
 #pragma once
-#include "utils/callbacks.h"
+#include "types/callbacks.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
