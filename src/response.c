@@ -143,7 +143,7 @@ response_t* response_empty(http_status status) {
 response_t* response_resource_not_found(void) {
     response_t* response = response_create(STATUS_NOT_FOUND);
     response->rt = RT_STRING;
-    
+
     char* buf = NULL;
     char* msg =  "The requested resource was not found";
     asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, STATUS_NOT_FOUND);
@@ -157,7 +157,7 @@ response_t* response_method_not_allowed(void) {
     response->rt = RT_STRING;
 
     char* buf = NULL;
-    char* msg =  "The request method is inappropriate for the requested resource";
+    char* msg = "The request method is inappropriate for the requested resource";
     asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, STATUS_METHOD_NOT_ALLOWED);
     response->body_content.body = buf;
 
