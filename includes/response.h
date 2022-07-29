@@ -73,6 +73,8 @@ response_t* response_from_string(http_status status, const char* body);
 
 response_t* response_empty(http_status status);
 
+response_t* response_resource_not_found(void);
+
 response_t* response_method_not_allowed(void);
 
 void response_destroy(response_t* response);

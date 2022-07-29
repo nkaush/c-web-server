@@ -14,6 +14,9 @@ static const char* HEADER_FMT = "%s: %s\r\n";
 // Assumes that headers come with \r\n at the end
 static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
 
+// Format: (message, status code)
+static const char* JSON_ERROR_CONTENT_FMT = "{\"message\":\"%s\",\"code\":%d}";
+
 static dictionary* status_code_to_string = NULL;
 
 static const char* HTTP_STATUS_STRINGS[NUM_HTTP_STATUS_CODES] = {
@@ -133,6 +136,32 @@ response_t* response_empty(http_status status) {
     response_t* response = response_create(status);
     response->body_content.body = NULL;
     response->rt = RT_EMPTY;
+
+    return response;
+}
+
+response_t* response_resource_not_found(void) {
+    response_t* response = response_create(STATUS_NOT_FOUND);
+    response->rt = RT_STRING;
+    asprintf(
+        &response->body_content.body, 
+        JSON_ERROR_CONTENT_FMT, 
+        "The requested resource was not found", 
+        STATUS_NOT_FOUND
+    );
+
+    return response;
+}
+
+response_t* response_method_not_allowed(void) {
+    response_t* response = response_create(STATUS_METHOD_NOT_ALLOWED);
+    response->rt = RT_STRING;
+    asprintf(
+        &response->body_content.body, 
+        JSON_ERROR_CONTENT_FMT, 
+        "The request method is inappropriate for the requested resource", 
+        STATUS_METHOD_NOT_ALLOWED
+    );
 
     return response;
 }

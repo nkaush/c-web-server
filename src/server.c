@@ -15,14 +15,16 @@
 #include <netdb.h>
 #include <err.h>
 
-#if defined(__APPLE__)
-#include <sys/event.h>
-#elif defined(__linux__)
-#include <sys/epoll.h>
-#endif
-
 #define MAX_FILE_DESCRIPTORS 1024
 #define TIMEOUT_MS 1000
+
+#if defined(__APPLE__)
+#include <sys/event.h>
+static struct kevent* events_array = NULL;
+#elif defined(__linux__)
+#include <sys/epoll.h>
+static struct epoll_event* events_array = NULL;
+#endif
 
 static int event_queue_fd = 0;
 static int stop_server = 0;
@@ -31,12 +33,6 @@ static int was_server_initialized = 0;
 
 static dictionary* routes = NULL;
 static dictionary* connections = NULL;
-
-#if defined(__APPLE__)
-static struct kevent* events_array = NULL;
-#elif defined(__linux__)
-static struct epoll_event* events_array = NULL;
-#endif
 
 // Configure the server socket.
 void server_setup_socket(char* port) {
@@ -144,16 +140,15 @@ int server_handle_new_client(void) {
         if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
         
-        if (client_event.flags & EV_ERROR)
+        if ( client_event.flags & EV_ERROR )
             errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
 #elif defined(__linux__)
         struct epoll_event event = {0};
         event.data.fd = client_fd;
         event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLERR | EPOLLHUP;
 
-        if (epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0) {
+        if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
             perror("epoll_ctl EPOLL_CTL_ADD");
-        }
 #endif
         char* client_addr_str = inet_ntoa(client_addr.sin_addr);
         uint16_t client_port = htons(client_addr.sin_port);
@@ -207,7 +202,24 @@ void server_handle_client(int client_fd) {
     }
 
     if ( conn->state == CS_REQUEST_RECEIVED ) {
+        char* requested_route = "";
+        response_t* response = NULL;
 
+        if ( !dictionary_contains(routes, requested_route) ) {
+            response = response_resource_not_found();
+
+        } else {
+            request_handler_t* handlers = dictionary_get(routes, requested_route);
+            request_handler_t handler = handlers[conn->request->method];
+
+            if ( !handler ) {
+                response = response_resource_not_found();
+            } else {
+                response = handler(conn->request);
+            }
+        }
+
+        /// @todo - do something with this response struct 
     }
 
     if ( conn->state == CS_WRITING_RESPONSE ) {
