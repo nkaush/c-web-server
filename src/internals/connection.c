@@ -110,3 +110,7 @@ void connection_try_parse_verb(connection_t* conn) {
     conn->state = CS_VERB_PARSED;
     conn->buf_ptr = idx_space + 1;
 }
+
+void connection_try_parse_url(connection_t* conn) {
+    /// @todo - complete this function
+}

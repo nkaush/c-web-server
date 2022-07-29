@@ -67,16 +67,31 @@ typedef struct _response {
     response_type rt;
 } response_t;
 
+/// STANDARD RESPONSE CONSTRUCTORS
+
+// Construct a response that will send the contents of a file as the response body
 response_t* response_from_file(http_status status, FILE* file);
 
+// Construct a response that will send the contents of the passed string 
+// UP UNTIL THE FIRST NULL BYTE!
 response_t* response_from_string(http_status status, const char* body);
 
+// Construct a response that will send an empty body
 response_t* response_empty(http_status status);
 
+/// ERROR RESPONSE CONSTRUCTORS
+
+// Constructs a response for 400 Bad Response with a pre-populated json message
+response_t* response_bad_request(void);
+
+// Constructs a response for 404 Not Found with a pre-populated json message
 response_t* response_resource_not_found(void);
 
+// Constructs a response for 405 Method Not Allowed with a pre-populated json message
 response_t* response_method_not_allowed(void);
 
+// Response destructor. This does not need to be called by users as it will 
+// automatically be called internally.
 void response_destroy(response_t* response);
 
 // Automatically adds the following headers to the response: Date, Server, Connection

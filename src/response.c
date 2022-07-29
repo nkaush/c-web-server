@@ -140,28 +140,30 @@ response_t* response_empty(http_status status) {
     return response;
 }
 
-response_t* response_resource_not_found(void) {
-    response_t* response = response_create(STATUS_NOT_FOUND);
+response_t* response_format_error(http_status status, const char* msg) {
+    response_t* response = response_create(status);
     response->rt = RT_STRING;
 
     char* buf = NULL;
-    char* msg =  "The requested resource was not found";
-    asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, STATUS_NOT_FOUND);
+    asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, status);
     response->body_content.body = buf;
 
     return response;
 }
 
+response_t* response_bad_request(void) {
+    static const char* msg = "The server was unable to process the request";
+    return response_format_error(msg, STATUS_METHOD_NOT_ALLOWED);
+}
+
+response_t* response_resource_not_found(void) {
+    static const char* msg = "The requested resource was not found";
+    return response_format_error(msg, STATUS_NOT_FOUND);
+}
+
 response_t* response_method_not_allowed(void) {
-    response_t* response = response_create(STATUS_METHOD_NOT_ALLOWED);
-    response->rt = RT_STRING;
-
-    char* buf = NULL;
-    char* msg = "The request method is inappropriate for the requested resource";
-    asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, STATUS_METHOD_NOT_ALLOWED);
-    response->body_content.body = buf;
-
-    return response;
+    static const char* msg = "The request method is inappropriate for the requested resource";
+    return response_format_error(msg, STATUS_METHOD_NOT_ALLOWED);
 }
 
 void response_destroy(response_t* response) {

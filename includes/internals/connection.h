@@ -46,3 +46,6 @@ void connection_try_parse_verb(connection_t* conn);
 
 // Attempt to parse the header received from a client.
 void connection_try_parse_header(connection_t* conn);
+
+// Attempt to parse the url received from a client.
+void connection_try_parse_url(connection_t* conn);

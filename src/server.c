@@ -204,7 +204,9 @@ void server_handle_client(int client_fd) {
     if ( conn->state == CS_REQUEST_RECEIVED ) {
         char* requested_route = "";
 
-        if ( !dictionary_contains(routes, requested_route) ) {
+        if ( conn->request->method == HTTP_UNKNOWN ) {
+            conn->response = response_bad_request();
+        } else if ( !dictionary_contains(routes, requested_route) ) {
             conn->response = response_resource_not_found();
         } else {
             request_handler_t* handlers = dictionary_get(routes, requested_route);
@@ -221,7 +223,8 @@ void server_handle_client(int client_fd) {
     }
 
     if ( conn->state == CS_WRITING_RESPONSE ) {
-
+        /// @todo format and send the conn->response field here
+        /// maybe create another enum and split the sending of the response header and response content?
     }
 }
 
