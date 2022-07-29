@@ -1,5 +1,6 @@
 #pragma once
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 
 // Constants used to print in color to the command line
@@ -25,7 +26,7 @@
 // #ifdef DEBUG
 // #define LOG(...)                      \
 //     do {                              \
-//         fprintf(stderr, "[DEBUG] "); \
+//         fprintf(stderr, "[DEBUG] ");  \
 //         fprintf(stderr, __VA_ARGS__); \
 //         fprintf(stderr, "\n");        \
 //     } while (0);
@@ -35,19 +36,24 @@
 
 #define LOG(...)                      \
     do {                              \
-        fprintf(stderr, "[DEBUG] "); \
+        fprintf(stderr, "[DEBUG] ");  \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n");        \
     } while (0);
 
-#define WARN(...)                      \
-    do {                              \
+#define WARN(...)                          \
+    do {                                   \
         fprintf(stderr, BOLDRED"[WARN] "); \
-        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, __VA_ARGS__);      \
         fprintf(stderr, "\n"RESET);        \
     } while (0);
 
-static const char* time_fmt = "%d %b %Y %H:%M:%S %Z";
+static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
+
+#define TIME_BUFFER_SIZE 30
+
+// buf must be a buffer of at least 30 characters
+void format_time(char* buf);
 
 void print_client_connected(char* addr, uint16_t port);
 

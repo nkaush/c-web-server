@@ -42,7 +42,7 @@ void connection_destroy(void* ptr) {
     free(this);
 }
 
-void connection_read(connection_t* conn) {
+ssize_t connection_read(connection_t* conn) {
     ssize_t bytes_read = read(
         conn->client_fd, 
         conn->buf + conn->buf_end, 
@@ -53,13 +53,14 @@ void connection_read(connection_t* conn) {
     if (bytes_read < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // The socket is not *really* ready for recv; wait until it is.
-            return;
+            return -1;
         } else {
             err(EXIT_FAILURE, "read");
         }
     }
 
     conn->buf_end += bytes_read;
+    return bytes_read;
 }
 
 void connection_shift_buffer(connection_t* conn) {
@@ -77,6 +78,8 @@ void connection_try_parse_verb(connection_t* conn) {
     }
 
     if ( !idx_space ) {
+        printf("space at %zu\n", idx_space);
+        printf("[%s]\n", conn->buf);
         conn->state = CS_REQUEST_RECEIVED;
         conn->request_method = HTTP_UNKNOWN;
         return;

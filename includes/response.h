@@ -1,6 +1,20 @@
 #pragma once
 #include "libs/dictionary.h"
 
+// This is an incomplete list of content types to use when setting the content type header sent to the client
+
+#define CONTENT_TYPE_CSS   "text/css"
+#define CONTENT_TYPE_CSV   "text/csv"
+#define CONTENT_TYPE_HTML  "text/html"
+#define CONTENT_TYPE_PLAIN "text/plain"
+#define CONTENT_TYPE_XML   "application/xml"
+#define CONTENT_TYPE_PDF   "application/pdf"
+#define CONTENT_TYPE_ZIP   "application/zip"
+#define CONTENT_TYPE_JSON  "application/json"
+#define CONTENT_TYPE_JS    "application/javascript"
+
+#define NUM_HTTP_STATUS_CODES 29
+
 // An incomplete enum of selected HTTP status codes
 typedef enum _http_status {
     STATUS_OK                         = 200,
@@ -39,3 +53,23 @@ typedef struct _response {
     http_status status;
     dictionary* headers; // a dictionary of (char*) -> (char*) 
 } response_t;
+
+response_t* response_create(http_status status);
+
+void response_destroy(response_t* response);
+
+// Automatically adds the following headers to the response: Date, Server, Connection
+// If Content-Length is not set, then sets the value to the length of the NUL-
+// terminated response body string. The user must free the memory allocated for 
+// the buffer passed into the function. This function returns the length of the
+// response header string NOT including the NUL-byte at the end.
+int response_format_header(response_t* response, char** buffer);
+
+// Utility function to make it easier to set the Content-Type header
+void response_set_content_type(response_t* response, const char* content_type);
+
+// Utility function to make it easier to set the Content-Length header
+void response_set_content_length(response_t* response, size_t length);
+
+// Utility function to set any response header
+void response_set_header(response_t* response, const char* key, const char* value);

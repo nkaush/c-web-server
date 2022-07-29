@@ -23,4 +23,4 @@ typedef struct _request {
     char* body;
 } request_t;
 
-char* http_method_to_string(http_method method);
+const char* http_method_to_string(http_method method);

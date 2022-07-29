@@ -6,7 +6,6 @@
 #include "server.h"
 
 #include <sys/socket.h>
-#include <sys/event.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
@@ -16,9 +15,16 @@
 #include <netdb.h>
 #include <err.h>
 
-#define MAX_FILE_DESCRIPTORS 1024
+#if defined(__APPLE__)
+#include <sys/event.h>
+#elif defined(__linux__)
+#include <sys/epoll.h>
+#endif
 
-static int kq_fd = 0;
+#define MAX_FILE_DESCRIPTORS 1024
+#define TIMEOUT_MS 1000
+
+static int event_queue_fd = 0;
 static int stop_server = 0;
 static int server_socket = 0;
 static int was_server_initialized = 0;
@@ -26,7 +32,11 @@ static int was_server_initialized = 0;
 static dictionary* routes = NULL;
 static dictionary* connections = NULL;
 
+#if defined(__APPLE__)
 static struct kevent* events_array = NULL;
+#elif defined(__linux__)
+static struct epoll_event* events_array = NULL;
+#endif
 
 // Configure the server socket.
 void server_setup_socket(char* port) {
@@ -74,7 +84,12 @@ void* allocate_handler_array(void* ptr) {
 
 // Configure the server's resources.
 void server_setup_resources(void) {
+#if defined(__APPLE__)
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
+#elif defined(__linux__)
+    events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct epoll_event));
+#endif
+    
     connections = dictionary_create(
         int_hash_function, int_compare, 
         int_copy_constructor, int_destructor,
@@ -122,15 +137,24 @@ int server_handle_new_client(void) {
         make_socket_non_blocking(client_fd);
         dictionary_set(connections, &client_fd, &client_fd);
     
+#if defined(__APPLE__)
         struct kevent client_event;
         EV_SET(&client_event, client_fd, EVFILT_READ | EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, NULL);
 
-        if ( kevent(kq_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
+        if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
         
         if (client_event.flags & EV_ERROR)
             errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
+#elif defined(__linux__)
+        struct epoll_event event = {0};
+        event.data.fd = client_fd;
+        event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLERR | EPOLLHUP;
 
+        if (epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0) {
+            perror("epoll_ctl EPOLL_CTL_ADD");
+        }
+#endif
         char* client_addr_str = inet_ntoa(client_addr.sin_addr);
         uint16_t client_port = htons(client_addr.sin_port);
         print_client_connected(client_addr_str, client_port);
@@ -140,33 +164,54 @@ int server_handle_new_client(void) {
 }
 
 // Handle an kqueue event from a client connection.
-void server_handle_client(int client_fd, struct kevent* event) {
+void server_handle_client(int client_fd) {
     connection_t* conn = dictionary_get(connections, &client_fd);
-    connection_read(conn);
+    if ( connection_read(conn) <= 0 ) { return; }
 
     if ( conn->state == CS_CLIENT_CONNECTED ) {
         connection_try_parse_verb(conn);
     }
     
-    if ( conn-> state == CS_VERB_PARSED ) {
-        LOG("%d", conn->request_method);
+    if ( conn->state == CS_VERB_PARSED ) {
         LOG("%s", conn->buf);
         LOG("[%s]", conn->buf + conn->buf_ptr);
+
+        if ( strstr(conn->buf + conn->buf_ptr, "\r\n\r\n") ) {
+            conn->state = CS_REQUEST_PARSED;
+        }
     }
 
-    if ( conn-> state == CS_REQUEST_PARSED ) {
+    if ( conn->state == CS_REQUEST_PARSED ) {
+        response_t* response = response_create(STATUS_OK);
+        response->body = "{\"response\":\"hello world!\"}\r\n\r\n";
+        response_set_content_type(response, CONTENT_TYPE_JSON);
+
+        char* header_str = NULL;
+        int header_len = response_format_header(response, &header_str);
+        LOG("[%s]", header_str);
+        write_all_to_socket(client_fd, header_str, header_len);
+        write_all_to_socket(client_fd, response->body, strlen(response->body));
+
+        free(header_str);
+        response_destroy(response);
+
+#if defined(__linux__)
+        if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
+            perror("epoll_ctl EPOLL_CTL_DEL");
+#endif
+        dictionary_remove(connections, &client_fd);
+        return;
+    }
+
+    if ( conn->state == CS_HEADERS_PARSED ) {
 
     }
 
-    if ( conn-> state == CS_HEADERS_PARSED ) {
+    if ( conn->state == CS_REQUEST_RECEIVED ) {
 
     }
 
-    if ( conn-> state == CS_REQUEST_RECEIVED ) {
-
-    }
-
-    if ( conn-> state == CS_WRITING_RESPONSE ) {
+    if ( conn->state == CS_WRITING_RESPONSE ) {
 
     }
 }
@@ -199,17 +244,30 @@ void server_init(char* port) {
     print_server_details(port);
     server_setup_resources();
 
-    kq_fd = kqueue();
-    if (kq_fd == -1)
+#if defined(__APPLE__)
+    event_queue_fd = kqueue();
+    if (event_queue_fd == -1)
         err(EXIT_FAILURE, "kqueue");
-
+    
     struct kevent accept_event; 
     EV_SET(&accept_event, server_socket, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, NULL);
 
-    if (kevent(kq_fd, &accept_event, 1, NULL, 0, NULL) == -1) 
+    if (kevent(event_queue_fd, &accept_event, 1, NULL, 0, NULL) == -1) 
         err(EXIT_FAILURE, "kevent register");
+
     if (accept_event.flags & EV_ERROR)
         errx(EXIT_FAILURE, "Event error: %s", strerror(accept_event.data));
+#elif defined(__linux__)
+    event_queue_fd = epoll_create1(0);
+    if (event_queue_fd == -1) 
+        err(EXIT_FAILURE, "epoll_create1");
+
+    struct epoll_event accept_event = { 0 };
+    accept_event.data.fd = server_socket;
+    accept_event.events = EPOLLIN;
+    if (epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, server_socket, &accept_event) < 0) 
+        err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_ADD");
+#endif
 }
 
 void server_launch(void) {
@@ -217,19 +275,26 @@ void server_launch(void) {
 
     int num_events = 0;
     while ( !stop_server ) {
-        num_events = kevent(kq_fd, 0, 0, events_array, MAX_FILE_DESCRIPTORS, 0);
+#if defined(__APPLE__)
+        num_events = kevent(event_queue_fd, 0, 0, events_array, MAX_FILE_DESCRIPTORS, 0);
+#elif defined(__linux__)
+        num_events = epoll_wait(event_queue_fd, events_array, MAX_FILE_DESCRIPTORS, TIMEOUT_MS);
+#endif
         if ( num_events == -1 )  { break; }
 
         for(int i = 0 ; i < num_events; i++) {
+#if defined(__APPLE__)
             int fd = events_array[i].ident;
             // events_array[i].data;
+#elif defined(__linux__)
+            int fd = events_array[i].data.fd;
+            // events_array[i].events;
+#endif     
             if (fd == server_socket) { 
                 // we have a new connection to the server
                 server_handle_new_client();
             } else if (fd > 0) {
-                server_handle_client(fd, events_array + i);
-
-                
+                server_handle_client(fd);
                 // connection_destroy(dictionary_get(connections, &fd));
                 // server_handle_client(events_array[i].ident, events_array[i].flags);
                 // dictionary_remove(connections, &this->client_fd);

@@ -36,7 +36,7 @@ void* connection_init(void* ptr);
 void connection_destroy(void* ptr);
 
 // Read bytes from a file descriptor and save to the connection buffer. 
-void connection_read(connection_t* conn);
+ssize_t connection_read(connection_t* conn);
 
 void connection_shift_buffer(connection_t* conn);
 
