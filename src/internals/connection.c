@@ -79,18 +79,10 @@ void connection_try_parse_verb(connection_t* conn) {
     }
 
     conn->buf[idx_space] = '\0';
-    size_t verb_hash = string_hash_function(conn->buf);
-    // hash the string value to avoid many calls to strncmp
-    // GET     --> 193456677
-    // HEAD    --> 6384105719
-    // POST    --> 6384404715
-    // PUT     --> 193467006
-    // DELETE  --> 6952134985656
-    // CONNECT --> 229419557091567
-    // OPTIONS --> 229435100789681
-    // TRACE   --> 210690186996
-
-    switch ( verb_hash ) {
+    
+    // hash the string value and compare against known hash values to avoid many 
+    // calls to strncmp since HTTP methods ARE case sensitive
+    switch ( string_hash_function(conn->buf) ) {
         case 193456677UL:
             conn->request = request_create(HTTP_GET); break;
         case 6384105719UL:
