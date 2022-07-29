@@ -33,6 +33,9 @@ void connection_destroy(void* ptr) {
     if ( this->request )
         request_destroy(this->request);
 
+    if ( this->response )
+        response_destroy(this->response);
+
     close(this->client_fd);
     free(this);
 }

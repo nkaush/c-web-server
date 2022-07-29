@@ -1,6 +1,7 @@
 #pragma once
 #include <time.h>
-#include "internals/common.h"
+#include "internals/io_utils.h"
+#include "response.h"
 #include "request.h"
 
 // This enum indicates the state of a connection.
@@ -16,6 +17,7 @@ typedef enum _connection_state {
 // This data structure keeps track of a connection to a client.
 typedef struct _connection {
     request_t* request;
+    response_t* response;
     char* buf;
     connection_state state;    
     int client_fd;

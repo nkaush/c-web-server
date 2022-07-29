@@ -1,5 +1,5 @@
 #include "internals/connection.h"
-#include "internals/common.h"
+#include "internals/io_utils.h"
 #include "internals/format.h"
 #include "libs/dictionary.h"
 #include "libs/callbacks.h"
@@ -203,23 +203,21 @@ void server_handle_client(int client_fd) {
 
     if ( conn->state == CS_REQUEST_RECEIVED ) {
         char* requested_route = "";
-        response_t* response = NULL;
 
         if ( !dictionary_contains(routes, requested_route) ) {
-            response = response_resource_not_found();
-
+            conn->response = response_resource_not_found();
         } else {
             request_handler_t* handlers = dictionary_get(routes, requested_route);
             request_handler_t handler = handlers[conn->request->method];
 
             if ( !handler ) {
-                response = response_resource_not_found();
+                conn->response = response_resource_not_found();
             } else {
-                response = handler(conn->request);
+                conn->response = handler(conn->request);
             }
         }
-
-        /// @todo - do something with this response struct 
+        
+        conn->state = CS_WRITING_RESPONSE;
     }
 
     if ( conn->state == CS_WRITING_RESPONSE ) {
@@ -306,9 +304,6 @@ void server_launch(void) {
                 server_handle_new_client();
             } else if (fd > 0) {
                 server_handle_client(fd);
-                // connection_destroy(dictionary_get(connections, &fd));
-                // server_handle_client(events_array[i].ident, events_array[i].flags);
-                // dictionary_remove(connections, &this->client_fd);
             }
         }
     }

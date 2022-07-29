@@ -1,6 +1,6 @@
 #pragma once
 #include "internals/connection.h"
-#include "internals/common.h"
+#include "internals/io_utils.h"
 #include "response.h"
 #include "request.h"
 
