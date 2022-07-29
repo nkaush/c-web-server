@@ -19,6 +19,7 @@ void* connection_init(void* ptr) {
     this->buf_ptr = 0;
 
     this->client_fd = client_fd;
+    this->response = NULL;
     this->request = NULL;
 
     return (void*) this;

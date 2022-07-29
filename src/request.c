@@ -18,6 +18,7 @@ request_t* request_create(http_method method) {
     request->headers = string_to_string_dictionary_create();
     request->params = string_to_string_dictionary_create();
     request->url_buffer = calloc(MAX_URL_LENGTH, sizeof(char));
+    request->protocol = NULL;
     request->path = NULL;
     request->body = NULL;
 
@@ -39,6 +40,8 @@ void request_destroy(request_t* request) {
 
     if ( request->body )
         free(request->body);
+
+    free(request);
 }
 
 const char* http_method_to_string(http_method method) {

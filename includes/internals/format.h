@@ -34,18 +34,20 @@
 // #define LOG(...) 
 // #endif
 
-#define LOG(...)                      \
-    do {                              \
-        fprintf(stderr, "[DEBUG] ");  \
-        fprintf(stderr, __VA_ARGS__); \
-        fprintf(stderr, "\n");        \
+#define LOG(...)                                         \
+    do {                                                 \
+        fprintf(stderr, "DEBUG ");                       \
+        fprintf(stderr, "[%s:%d] ", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                    \
+        fprintf(stderr, "\n");                           \
     } while (0);
 
-#define WARN(...)                          \
-    do {                                   \
-        fprintf(stderr, BOLDRED"[WARN] "); \
-        fprintf(stderr, __VA_ARGS__);      \
-        fprintf(stderr, "\n"RESET);        \
+#define WARN(...)                                        \
+    do {                                                 \
+        fprintf(stderr, BOLDRED"WARN ");                 \
+        fprintf(stderr, "[%s:%d] ", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                    \
+        fprintf(stderr, "\n"RESET);                      \
     } while (0);
 
 static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
