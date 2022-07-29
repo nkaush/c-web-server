@@ -1,7 +1,11 @@
 #include "response.h"
 #include "internals/format.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <time.h>
+#include <err.h>
 
 // Format: (header_name, header_value)
 static const char* HEADER_FMT = "%s: %s\r\n";
@@ -105,7 +109,30 @@ response_t* response_create(http_status status) {
     response_t* response = malloc(sizeof(response_t));
     response->status = status;
     response->headers = string_to_string_dictionary_create();
-    response->body = NULL;
+
+    return response;
+}
+
+response_t* response_from_file(http_status status, FILE* file) {
+    response_t* response = response_create(status);
+    response->body_content.file = file;
+    response->rt = RT_FILE;
+    
+    return response;
+}
+
+response_t* response_from_string(http_status status, const char* body) {
+    response_t* response = response_create(status);
+    response->body_content.body = body;
+    response->rt = RT_STRING;
+
+    return response;
+}
+
+response_t* response_empty(http_status status) {
+    response_t* response = response_create(status);
+    response->body_content.body = NULL;
+    response->rt = RT_EMPTY;
 
     return response;
 }
@@ -126,6 +153,22 @@ const char* http_status_to_string(http_status status) {
     return "";
 }
 
+void infer_content_length(response_t* response) {
+    switch ( response->rt ) {
+        case RT_FILE: {
+            struct stat info = { 0 };
+            if ( fstat(fileno(response->body_content.file), &info) != 0 )
+                err(EXIT_FAILURE, "fstat");
+
+            response_set_content_length(response, (size_t) info.st_size);
+        } break;
+        case RT_STRING:
+            response_set_content_length(response, strlen(response->body_content.body)); break;
+        case RT_EMPTY:
+            response_set_content_length(response, 0); break;
+    }
+}
+
 int response_format_header(response_t* response, char** buffer) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_time(time_buf);
@@ -135,7 +178,7 @@ int response_format_header(response_t* response, char** buffer) {
     dictionary_set(response->headers, "Connection", "close");
     
     if ( !dictionary_contains(response->headers, "Content-Length") )
-        response_set_content_length(response, strlen(response->body));
+        infer_content_length(response);
     
     vector* defined_header_keys = dictionary_keys(response->headers);
     vector* formatted_headers = string_vector_create();

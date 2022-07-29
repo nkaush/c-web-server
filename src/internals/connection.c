@@ -12,19 +12,14 @@ void* connection_init(void* ptr) {
 
     connection_t* this = malloc(sizeof(connection_t));
     this->state = CS_CLIENT_CONNECTED;
-    this->parsed_num_bytes = 0;
-    this->bytes_to_transmit = 0;
-    this->bytes_transmitted = 0;
-    this->request_method = -1;
-
     clock_gettime(CLOCK_REALTIME, &this->time_received);
 
     this->buf = calloc(BUFFER_SIZE, sizeof(char));
     this->buf_end = 0;
     this->buf_ptr = 0;
 
-    this->filename = NULL;
     this->client_fd = client_fd;
+    this->request = NULL;
 
     return (void*) this;
 }
@@ -32,11 +27,11 @@ void* connection_init(void* ptr) {
 void connection_destroy(void* ptr) {
     connection_t* this = (connection_t*) ptr;
 
-    if ( this->filename ) 
-        free(this->filename);
-
     if ( this->buf )
         free(this->buf);
+
+    if ( this->request )
+        request_destroy(this->request);
 
     close(this->client_fd);
     free(this);
@@ -78,10 +73,8 @@ void connection_try_parse_verb(connection_t* conn) {
     }
 
     if ( !idx_space ) {
-        printf("space at %zu\n", idx_space);
-        printf("[%s]\n", conn->buf);
         conn->state = CS_REQUEST_RECEIVED;
-        conn->request_method = HTTP_UNKNOWN;
+        conn->request = request_create(HTTP_UNKNOWN);
         return;
     }
 
@@ -99,23 +92,23 @@ void connection_try_parse_verb(connection_t* conn) {
 
     switch ( verb_hash ) {
         case 193456677UL:
-            conn->request_method = HTTP_GET; break;
+            conn->request = request_create(HTTP_GET); break;
         case 6384105719UL:
-            conn->request_method = HTTP_HEAD; break;
+            conn->request = request_create(HTTP_HEAD); break;
         case 6384404715UL:
-            conn->request_method = HTTP_POST; break;
+            conn->request = request_create(HTTP_POST); break;
         case 193467006UL:
-            conn->request_method = HTTP_PUT; break;
+            conn->request = request_create(HTTP_PUT); break;
         case 6952134985656UL:
-            conn->request_method = HTTP_DELETE; break;
+            conn->request = request_create(HTTP_DELETE); break;
         case 229419557091567UL:
-            conn->request_method = HTTP_CONNECT; break;
+            conn->request = request_create(HTTP_CONNECT); break;
         case 229435100789681UL:
-            conn->request_method = HTTP_OPTIONS; break;
+            conn->request = request_create(HTTP_OPTIONS); break;
         case 210690186996UL:
-            conn->request_method = HTTP_TRACE; break;
+            conn->request = request_create(HTTP_TRACE); break;
         default:
-            conn->request_method = HTTP_UNKNOWN; conn->state = CS_REQUEST_RECEIVED; return;
+            conn->request = request_create(HTTP_UNKNOWN); conn->state = CS_REQUEST_RECEIVED; return;
     }
 
     conn->state = CS_VERB_PARSED;

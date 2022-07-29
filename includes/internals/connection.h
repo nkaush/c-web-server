@@ -15,17 +15,16 @@ typedef enum _connection_state {
 
 // This data structure keeps track of a connection to a client.
 typedef struct _connection {
-    struct timespec time_received;
+    request_t* request;
     char* buf;
-    connection_state state;
-    size_t bytes_to_transmit;
-    size_t bytes_transmitted;
-    int parsed_num_bytes;
-    char* filename;
+    connection_state state;    
     int client_fd;
     int buf_end;
     int buf_ptr;
-    http_method request_method;
+    struct timespec time_received;
+    // body_bytes_received
+    // size_t bytes_to_transmit;
+    // size_t bytes_transmitted;
 } connection_t;
 
 // Initialize a connection data structure and save to the global connections 

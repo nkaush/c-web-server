@@ -182,15 +182,14 @@ void server_handle_client(int client_fd) {
     }
 
     if ( conn->state == CS_REQUEST_PARSED ) {
-        response_t* response = response_create(STATUS_OK);
-        response->body = "{\"response\":\"hello world!\"}\r\n\r\n";
+        response_t* response = response_from_string(STATUS_OK, "{\"response\":\"hello world!\"}");
         response_set_content_type(response, CONTENT_TYPE_JSON);
 
         char* header_str = NULL;
         int header_len = response_format_header(response, &header_str);
         LOG("[%s]", header_str);
         write_all_to_socket(client_fd, header_str, header_len);
-        write_all_to_socket(client_fd, response->body, strlen(response->body));
+        write_all_to_socket(client_fd, response->body_content.body, strlen(response->body_content.body));
 
         free(header_str);
         response_destroy(response);

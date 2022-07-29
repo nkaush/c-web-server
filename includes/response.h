@@ -1,5 +1,6 @@
 #pragma once
 #include "libs/dictionary.h"
+#include <stdio.h>
 
 // This is an incomplete list of content types to use when setting the content type header sent to the client
 
@@ -48,13 +49,31 @@ typedef enum _http_status {
     STATUS_INSUFFICIENT_STORAGE       = 507
 } http_status;
 
+typedef enum _response_type {
+    RT_FILE,
+    RT_STRING,
+    RT_EMPTY
+} response_type;
+
+typedef union _body_content {
+    FILE* file;
+    const char* body;
+} body_content_t;
+
 typedef struct _response {
-    char* body;
-    http_status status;
+    body_content_t body_content;
     dictionary* headers; // a dictionary of (char*) -> (char*) 
+    http_status status;
+    response_type rt;
 } response_t;
 
-response_t* response_create(http_status status);
+response_t* response_from_file(http_status status, FILE* file);
+
+response_t* response_from_string(http_status status, const char* body);
+
+response_t* response_empty(http_status status);
+
+response_t* response_method_not_allowed(void);
 
 void response_destroy(response_t* response);
 
