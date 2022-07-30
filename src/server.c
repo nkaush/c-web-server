@@ -3,6 +3,7 @@
 #include "internals/format.h"
 #include "libs/dictionary.h"
 #include "libs/callbacks.h"
+#include "protocol.h"
 #include "server.h"
 
 #include <sys/socket.h>
@@ -167,16 +168,23 @@ void server_handle_client(int client_fd) {
         connection_try_parse_verb(conn);
     }
     
-    if ( conn->state == CS_VERB_PARSED ) {
-        LOG("%s", conn->buf);
-        LOG("[%s]", conn->buf + conn->buf_ptr);
+    if ( conn->state == CS_METHOD_PARSED ) {
+        // if ( strstr(conn->buf + conn->buf_ptr, "\r\n\r\n") ) {
+        //     conn->state = CS_REQUEST_PARSED;
+        // }
 
-        if ( strstr(conn->buf + conn->buf_ptr, "\r\n\r\n") ) {
-            conn->state = CS_REQUEST_PARSED;
-        }
+        connection_try_parse_url(conn);
     }
 
-    if ( conn->state == CS_REQUEST_PARSED ) {
+    if ( conn->state == CS_URL_PARSED ) {
+        connection_try_parse_protocol(conn);
+
+        LOG("[%s] [%s] [%s]", http_method_to_string(conn->request->method), conn->request->path, conn->request->protocol);
+        LOG("[%s]", conn->buf + conn->buf_ptr);
+    }
+
+    if ( conn->state == CS_REQUEST_PARSED ) { 
+        /// @todo parse headers here
         response_t* response = response_from_string(STATUS_OK, "{\"response\":\"hello world!\"}");
         response_set_content_type(response, CONTENT_TYPE_JSON);
 
@@ -198,7 +206,7 @@ void server_handle_client(int client_fd) {
     }
 
     if ( conn->state == CS_HEADERS_PARSED ) {
-
+        /// @todo parse request body here
     }
 
     if ( conn->state == CS_REQUEST_RECEIVED ) {

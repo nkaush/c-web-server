@@ -1,23 +1,11 @@
 #include "request.h"
 #include "internals/format.h"
 
-static const char* HTTP_METHOD_STRINGS[NUM_HTTP_METHODS] = {
-    "GET",
-    "HEAD",
-    "POST",
-    "PUT",
-    "DELETE",
-    "CONNECT",
-    "OPTIONS",
-    "TRACE"
-};
-
 request_t* request_create(http_method method) {
     request_t* request = malloc(sizeof(request_t));
     request->method = method;
     request->headers = string_to_string_dictionary_create();
     request->params = string_to_string_dictionary_create();
-    request->url_buffer = calloc(MAX_URL_LENGTH, sizeof(char));
     request->protocol = NULL;
     request->path = NULL;
     request->body = NULL;
@@ -28,9 +16,6 @@ request_t* request_create(http_method method) {
 void request_destroy(request_t* request) {
     dictionary_destroy(request->headers);
     dictionary_destroy(request->params);
-
-    if ( request->url_buffer ) 
-        free(request->url_buffer);
 
     if ( request->protocol ) 
         free(request->protocol);
@@ -44,11 +29,22 @@ void request_destroy(request_t* request) {
     free(request);
 }
 
-const char* http_method_to_string(http_method method) {
-    if ( method >= 0 && method < NUM_HTTP_METHODS ) {
-        return HTTP_METHOD_STRINGS[method];
-    }
+void request_parse_url(request_t* request) {
+    /// @todo maybe some url path cleaning here...
+    char* question = strstr(request->path, "?");
 
-    WARN("Unknown http_method enum variant: %d", method);
-    return "";
+    if (question != NULL) {
+        // tructate the route to exclude params and begin parsing params
+        *question++ = '\0';
+
+        /* get the first token */
+        char* token = strtok(question, "&");
+        
+        /* walk through other tokens */
+        while( token != NULL ) {
+            printf( " %s\n", token );
+            
+            token = strtok(NULL, s);
+        }
+    }
 }

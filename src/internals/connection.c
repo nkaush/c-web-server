@@ -107,10 +107,42 @@ void connection_try_parse_verb(connection_t* conn) {
             conn->request = request_create(HTTP_UNKNOWN); conn->state = CS_REQUEST_RECEIVED; return;
     }
 
-    conn->state = CS_VERB_PARSED;
+    conn->state = CS_METHOD_PARSED;
     conn->buf_ptr = idx_space + 1;
 }
 
 void connection_try_parse_url(connection_t* conn) {
-    /// @todo - complete this function
+    char* url_start = conn->buf + conn->buf_ptr;
+    char* idx_space = strstr(url_start, " ");
+
+    // DO NOT add 1 since we are excluding the space from the length
+    size_t length = (size_t) idx_space - (size_t) url_start;
+
+    if ( length >= MAX_URL_LENGTH ) {
+        conn->state = CS_WRITING_RESPONSE;
+        conn->response = response_uri_too_long();
+        return;
+    }
+
+    *idx_space = '\0';
+    conn->request->path = strdup(url_start);
+    conn->state = CS_URL_PARSED;
+    conn->buf_ptr += length + 1;
+
+    /// @todo parse request params
+}
+
+void connection_try_parse_protocol(connection_t* conn) {
+    /// @todo maybe some kind of validation on the protocol?
+    char* protocol_start = conn->buf + conn->buf_ptr;
+    char* idx_space = strstr(protocol_start, "\r\n");
+
+    // DO NOT add 1 since we are excluding the space from the length
+    size_t length = (size_t) idx_space - (size_t) protocol_start;
+
+    // Set the CRLF pattern to NULL so it is not included in the protocol
+    *idx_space++ = '\0';
+    conn->request->protocol = strdup(protocol_start);
+    conn->state = CS_REQUEST_PARSED;
+    conn->buf_ptr += length + 2; // add 1 to skip the \n at the end of CRLF
 }

@@ -7,7 +7,8 @@
 // This enum indicates the state of a connection.
 typedef enum _connection_state {
     CS_CLIENT_CONNECTED,
-    CS_VERB_PARSED,
+    CS_METHOD_PARSED,
+    CS_URL_PARSED,
     CS_REQUEST_PARSED,
     CS_HEADERS_PARSED,
     CS_REQUEST_RECEIVED,
@@ -49,3 +50,6 @@ void connection_try_parse_header(connection_t* conn);
 
 // Attempt to parse the url received from a client.
 void connection_try_parse_url(connection_t* conn);
+
+// Attempt to parse the request protocol.
+void connection_try_parse_protocol(connection_t* conn);
