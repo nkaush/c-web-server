@@ -30,21 +30,26 @@ void request_destroy(request_t* request) {
 }
 
 void request_parse_url(request_t* request) {
+    static const char* QUERY_PARAM_BEGIN = "?";
+    static const char* QUERY_PARAM_DELIM = "&";
+    static const char* QUERY_PARAM_SEP = "=";
+
     /// @todo maybe some url path cleaning here...
-    char* question = strstr(request->path, "?");
+    char* question = strstr(request->path, QUERY_PARAM_BEGIN);
 
-    if (question != NULL) {
-        // tructate the route to exclude params and begin parsing params
-        *question++ = '\0';
+    if ( !question ) { return; }
 
-        /* get the first token */
-        char* token = strtok(question, "&");
+    // tructate the route to exclude params and begin parsing params
+    *question++ = '\0';
+
+    char* token = NULL;
+    while ( ( token = strsep(&question, QUERY_PARAM_DELIM) ) ) {
+        char* key = strsep(&token, QUERY_PARAM_SEP);
         
-        /* walk through other tokens */
-        while( token != NULL ) {
-            printf( " %s\n", token );
-            
-            token = strtok(NULL, s);
-        }
+        // Do not add query param if the value is NULL since url is invalid
+        // ex: ?hello=world& --> [("hello"="world"), (""=NULL)]
+        // ex: ?hello=world&test --> [("hello"="world"), ("test"=NULL)]
+        if ( token )
+            dictionary_set(request->params, key, token);
     }
 }

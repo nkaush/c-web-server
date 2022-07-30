@@ -12,6 +12,4 @@ int main(int argc, char** argv) {
         char* key = strsep(&token, "=");
         printf("k=[%s], v=[%s]\n", key, token);
     }
-
-    return(0);
 }

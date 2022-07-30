@@ -129,7 +129,7 @@ void connection_try_parse_url(connection_t* conn) {
     conn->state = CS_URL_PARSED;
     conn->buf_ptr += length + 1;
 
-    /// @todo parse request params
+    request_parse_url(conn->request);
 }
 
 void connection_try_parse_protocol(connection_t* conn) {
