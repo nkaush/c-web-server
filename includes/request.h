@@ -18,4 +18,4 @@ request_t* request_create(http_method method);
 // Destroy the passed request_t struct
 void request_destroy(request_t* request);
 
-void request_parse_url(request_t* request);
+void request_parse_query_params(request_t* request);

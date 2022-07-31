@@ -129,13 +129,13 @@ void connection_try_parse_url(connection_t* conn) {
     conn->state = CS_URL_PARSED;
     conn->buf_ptr += length + 1;
 
-    request_parse_url(conn->request);
+    request_parse_query_params(conn->request);
 }
 
 void connection_try_parse_protocol(connection_t* conn) {
     /// @todo maybe some kind of validation on the protocol?
     char* protocol_start = conn->buf + conn->buf_ptr;
-    char* idx_space = strstr(protocol_start, "\r\n");
+    char* idx_space = strstr(protocol_start, CRLF);
 
     // DO NOT add 1 since we are excluding the space from the length
     size_t length = (size_t) idx_space - (size_t) protocol_start;
@@ -145,4 +145,38 @@ void connection_try_parse_protocol(connection_t* conn) {
     conn->request->protocol = strdup(protocol_start);
     conn->state = CS_REQUEST_PARSED;
     conn->buf_ptr += length + 2; // add 1 to skip the \n at the end of CRLF
+}
+
+void connection_try_parse_headers(connection_t* conn) {
+    static const char* HEADER_SEP = ": ";
+    static const char* EMPTY_HEADER_KEY = "";
+
+    char* header_str = conn->buf + conn->buf_ptr;
+    int was_prev_empty = 0;
+
+    char* token = NULL;
+    while ( ( token = strsep(&header_str, CRLF) ) ) {
+        // call strsep again to move to next token since CRLF is 2 chars long
+        strsep(&header_str, CRLF); 
+
+        // call strsep twice to move to next token since HEADER_SEP is 2 chars
+        char* key = strsep(&token, HEADER_SEP);
+        strsep(&token, HEADER_SEP);
+
+        // end parsing if we see 2 empty lines
+        if ( !strcmp(key, EMPTY_HEADER_KEY) ) {
+            if ( !was_prev_empty ) { was_prev_empty = 1; continue; }
+            else break;
+        }  
+        
+        printf("k=[%s], v=[%s]\n", key, token);
+        
+        // Do not add query param if the value is NULL since url is invalid
+        // ex: ?hello=world& --> [("hello"="world"), (""=NULL)]
+        // ex: ?hello=world&test --> [("hello"="world"), ("test"=NULL)]
+        if ( token )
+            dictionary_set(conn->request->headers, key, token);
+    }
+
+    conn->state = CS_HEADERS_PARSED;
 }

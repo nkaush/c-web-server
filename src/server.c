@@ -184,6 +184,11 @@ void server_handle_client(int client_fd) {
     }
 
     if ( conn->state == CS_REQUEST_PARSED ) { 
+        /// @todo parse request body here
+        connection_try_parse_headers(conn);
+    }
+
+    if ( conn->state == CS_HEADERS_PARSED ) { 
         /// @todo parse headers here
         response_t* response = response_from_string(STATUS_OK, "{\"response\":\"hello world!\"}");
         response_set_content_type(response, CONTENT_TYPE_JSON);
@@ -203,10 +208,6 @@ void server_handle_client(int client_fd) {
 #endif
         dictionary_remove(connections, &client_fd);
         return;
-    }
-
-    if ( conn->state == CS_HEADERS_PARSED ) {
-        /// @todo parse request body here
     }
 
     if ( conn->state == CS_REQUEST_RECEIVED ) {

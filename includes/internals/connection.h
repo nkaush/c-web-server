@@ -51,5 +51,8 @@ void connection_try_parse_header(connection_t* conn);
 // Attempt to parse the url received from a client.
 void connection_try_parse_url(connection_t* conn);
 
-// Attempt to parse the request protocol.
+// Attempt to parse the request protocol received from a client.
 void connection_try_parse_protocol(connection_t* conn);
+
+// Attempt to parse the request headers received from a client.
+void connection_try_parse_headers(connection_t* conn);
