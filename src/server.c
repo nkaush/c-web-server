@@ -164,32 +164,25 @@ void server_handle_client(int client_fd) {
     connection_t* conn = dictionary_get(connections, &client_fd);
     if ( connection_read(conn) <= 0 ) { return; }
 
-    if ( conn->state == CS_CLIENT_CONNECTED ) {
+    if ( conn->state == CS_CLIENT_CONNECTED )
         connection_try_parse_verb(conn);
-    }
     
-    if ( conn->state == CS_METHOD_PARSED ) {
-        // if ( strstr(conn->buf + conn->buf_ptr, "\r\n\r\n") ) {
-        //     conn->state = CS_REQUEST_PARSED;
-        // }
-
+    if ( conn->state == CS_METHOD_PARSED )
         connection_try_parse_url(conn);
-    }
 
     if ( conn->state == CS_URL_PARSED ) {
         connection_try_parse_protocol(conn);
 
         LOG("[%s] [%s] [%s]", http_method_to_string(conn->request->method), conn->request->path, conn->request->protocol);
-        LOG("[%s]", conn->buf + conn->buf_ptr);
     }
 
     if ( conn->state == CS_REQUEST_PARSED ) { 
-        /// @todo parse request body here
+        /// @todo parse headers here
         connection_try_parse_headers(conn);
     }
 
     if ( conn->state == CS_HEADERS_PARSED ) { 
-        /// @todo parse headers here
+        /// @todo parse request body here
         response_t* response = response_from_string(STATUS_OK, "{\"response\":\"hello world!\"}");
         response_set_content_type(response, CONTENT_TYPE_JSON);
 

@@ -168,12 +168,7 @@ void connection_try_parse_headers(connection_t* conn) {
             if ( !was_prev_empty ) { was_prev_empty = 1; continue; }
             else break;
         }  
-        
-        printf("k=[%s], v=[%s]\n", key, token);
-        
-        // Do not add query param if the value is NULL since url is invalid
-        // ex: ?hello=world& --> [("hello"="world"), (""=NULL)]
-        // ex: ?hello=world&test --> [("hello"="world"), ("test"=NULL)]
+
         if ( token )
             dictionary_set(conn->request->headers, key, token);
     }

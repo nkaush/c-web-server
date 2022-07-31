@@ -22,6 +22,13 @@ response_t* response_create(http_status status) {
     response->status = status;
     response->headers = string_to_string_dictionary_create();
 
+    char time_buf[TIME_BUFFER_SIZE] = { 0 };
+    format_time(time_buf);
+
+    dictionary_set(response->headers, "Date", time_buf);
+    dictionary_set(response->headers, "Server", "kqueue-server/0.0.1 (MacOS X)");
+    dictionary_set(response->headers, "Connection", "close");
+
     return response;
 }
 
@@ -29,6 +36,8 @@ response_t* response_from_file(http_status status, FILE* file) {
     response_t* response = response_create(status);
     response->body_content.file = file;
     response->rt = RT_FILE;
+
+    /// @todo set the last-modified header to the file last modified time
     
     return response;
 }
@@ -117,13 +126,6 @@ void infer_content_length(response_t* response) {
 }
 
 int response_format_header(response_t* response, char** buffer) {
-    char time_buf[TIME_BUFFER_SIZE] = { 0 };
-    format_time(time_buf);
-
-    dictionary_set(response->headers, "Date", time_buf);
-    dictionary_set(response->headers, "Server", "kqueue-server/0.0.1 (MacOS X)");
-    dictionary_set(response->headers, "Connection", "close");
-    
     if ( !dictionary_contains(response->headers, "Content-Length") )
         infer_content_length(response);
     

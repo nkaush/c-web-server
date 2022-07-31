@@ -23,6 +23,8 @@
 #define BOLDCYAN    "\033[1m\033[36m"      // Bold Cyan
 #define BOLDWHITE   "\033[1m\033[37m"      // Bold White
 
+#define TIME_BUFFER_SIZE 30
+
 // #ifdef DEBUG
 // #define LOG(...)                      \
 //     do {                              \
@@ -51,8 +53,6 @@
     } while (0);
 
 static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
-
-#define TIME_BUFFER_SIZE 30
 
 // buf must be a buffer of at least 30 characters
 void format_time(char* buf);

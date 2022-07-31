@@ -111,5 +111,11 @@ clean:
 build:
 	docker build -t neilk3/linux-dev-env .
 
+build-release:
+	docker build -t neilk3/web-server -f Dockerfile.release .
+
 start:
-	docker run -it --rm -p 49500:49500 -v `pwd`:/mount --hostname sp22-cs241-206.cs.illinois.edu neilk3/linux-dev-env
+	docker run -it --rm -p 49500:49500 -v `pwd`:/mount neilk3/linux-dev-env
+
+start-release:
+	docker run -it --rm -p 80:8000 neilk3/web-server

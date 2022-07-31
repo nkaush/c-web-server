@@ -1,0 +1,22 @@
+FROM alpine:latest as build
+
+WORKDIR /mount
+ENV TZ=US/Pacific
+
+RUN apk --update add --no-cache gcc clang make libc-dev
+
+COPY src/ src/
+COPY includes/ includes/
+COPY Makefile Makefile
+
+RUN make server
+
+FROM alpine:latest as service
+
+WORKDIR /service
+
+COPY --from=build /mount/server /service/
+
+EXPOSE 8000
+
+CMD [ "/service/server", "8000" ]
