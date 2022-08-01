@@ -236,7 +236,7 @@ void server_handle_client(int client_fd) {
         LOG("[%s] [%s] [%s]", http_method_to_string(conn->request->method), conn->request->path, conn->request->protocol);
     }
 
-    if ( conn->state == CS_REQUEST_PARSED )
+    if ( conn->state == CS_REQUEST_PARSED ) /// @todo parse request body here
         connection_try_parse_headers(conn);
 
     if ( conn->state == CS_HEADERS_PARSED ) { 

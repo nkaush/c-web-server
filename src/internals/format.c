@@ -41,6 +41,8 @@ void print_server_details(char* port) {
     char* ip_buffer = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0]));
     if ( !ip_buffer )
         err(EXIT_FAILURE, "inet_ntoa");
+
+    free(host_entry);
   
     printf("Hostname:\t"BOLDGREEN"%s"RESET"\nHost IP:\t"BOLDGREEN"%s:%s"RESET"\n", 
         host_buffer, ip_buffer, port

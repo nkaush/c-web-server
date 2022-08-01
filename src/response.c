@@ -32,6 +32,17 @@ response_t* response_create(http_status status) {
     return response;
 }
 
+void response_destroy(response_t* response) {
+    dictionary_destroy(response->headers);
+
+    if ( response->rt == RT_FILE )
+        fclose(response->body_content.file);
+    else if ( response->rt == RT_STRING && response->body_content.body )
+        free((void*) response->body_content.body);
+
+    free(response);
+}
+
 response_t* response_from_file(http_status status, FILE* file) {
     response_t* response = response_create(status);
     response->body_content.file = file;
@@ -55,7 +66,7 @@ response_t* response_from_file(http_status status, FILE* file) {
 
 response_t* response_from_string(http_status status, const char* body) {
     response_t* response = response_create(status);
-    response->body_content.body = body;
+    response->body_content.body = strdup(body);
     response->rt = RT_STRING;
 
     response_set_content_length(response, strlen(response->body_content.body)); 
@@ -74,12 +85,11 @@ response_t* response_empty(http_status status) {
 }
 
 response_t* response_format_error(http_status status, const char* msg) {
-    response_t* response = response_create(status);
-    response->rt = RT_STRING;
-
     char* buf = NULL;
     asprintf(&buf, JSON_ERROR_CONTENT_FMT, msg, status);
-    response->body_content.body = buf;
+
+    response_t* response = response_from_string(status, buf);
+    free(buf);
 
     return response;
 }
@@ -102,11 +112,6 @@ response_t* response_method_not_allowed(void) {
 response_t* response_uri_too_long(void) {
     static const char* msg = "The requested URI is too long";
     return response_format_error(STATUS_URI_TOO_LONG, msg);
-}
-
-void response_destroy(response_t* response) {
-    dictionary_destroy(response->headers);
-    free(response);
 }
 
 void response_set_content_type(response_t* response, const char* content_type) {
