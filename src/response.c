@@ -2,6 +2,7 @@
 #include "internals/format.h"
 
 #include <sys/utsname.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <err.h>
 
@@ -36,7 +37,18 @@ response_t* response_from_file(http_status status, FILE* file) {
     response->body_content.file = file;
     response->rt = RT_FILE;
 
-    /// @todo set the last-modified header to the file last modified time
+    struct stat info = { 0 };
+    if ( fstat(fileno(response->body_content.file), &info) != 0 )
+        err(EXIT_FAILURE, "fstat");
+
+    char time_buf[TIME_BUFFER_SIZE] = { 0 };
+#if defined(__APPLE__)
+    format_time(time_buf, info.st_mtimespec.tv_sec);
+#elif defined(__linux__)
+    format_time(time_buf, info.st_mtim.tv_sec);
+#endif
+    dictionary_set(response->headers, "Last-Modified", time_buf);
+    response_set_content_length(response, (size_t) info.st_size);
     
     return response;
 }
@@ -46,6 +58,8 @@ response_t* response_from_string(http_status status, const char* body) {
     response->body_content.body = body;
     response->rt = RT_STRING;
 
+    response_set_content_length(response, strlen(response->body_content.body)); 
+
     return response;
 }
 
@@ -53,6 +67,8 @@ response_t* response_empty(http_status status) {
     response_t* response = response_create(status);
     response->body_content.body = NULL;
     response->rt = RT_EMPTY;
+
+    response_set_content_length(response, 0);
 
     return response;
 }

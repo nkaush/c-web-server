@@ -8,8 +8,6 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
@@ -168,33 +166,7 @@ int server_handle_new_client(void) {
     }
 }
 
-void infer_content_length(response_t* response) {
-    switch ( response->rt ) {
-        case RT_FILE: {
-            struct stat info = { 0 };
-            if ( fstat(fileno(response->body_content.file), &info) != 0 )
-                err(EXIT_FAILURE, "fstat");
-
-            char time_buf[TIME_BUFFER_SIZE] = { 0 };
-#if defined(__APPLE__)
-            format_time(time_buf, info.st_mtimespec.tv_sec);
-#elif defined(__linux__)
-            format_time(time_buf, info.st_mtim.tv_sec);
-#endif
-            dictionary_set(response->headers, "Last-Modified", time_buf);
-            response_set_content_length(response, (size_t) info.st_size);
-        } break;
-        case RT_STRING:
-            response_set_content_length(response, strlen(response->body_content.body)); break;
-        case RT_EMPTY:
-            response_set_content_length(response, 0); break;
-    }
-}
-
 int format_response_header(response_t* response, char** buffer) {
-    if ( !dictionary_contains(response->headers, "Content-Length") )
-        infer_content_length(response);
-    
     vector* defined_header_keys = dictionary_keys(response->headers);
     vector* formatted_headers = string_vector_create();
     int allocated_space = 1; // allow for NUL-byte at the end
@@ -268,25 +240,6 @@ void server_handle_client(int client_fd) {
         connection_try_parse_headers(conn);
 
     if ( conn->state == CS_HEADERS_PARSED ) { 
-        /// @todo parse request body here
-        // response_t* response = response_from_string(STATUS_OK, "{\"response\":\"hello world!\"}");
-        // response_set_content_type(response, CONTENT_TYPE_JSON);
-
-        // char* header_str = NULL;
-        // int header_len = response_format_header(response, &header_str);
-        // LOG("[%s]", header_str);
-        // write_all_to_socket(client_fd, header_str, header_len);
-        // write_all_to_socket(client_fd, response->body_content.body, strlen(response->body_content.body));
-
-        // free(header_str);
-
-// #if defined(__linux__)
-//         if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
-//             perror("epoll_ctl EPOLL_CTL_DEL");
-// #endif
-        // dictionary_remove(connections, &client_fd);
-        // return;
-
         conn->state = CS_REQUEST_RECEIVED;
     }
 
