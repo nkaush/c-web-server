@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 // Constants used to print in color to the command line
 // Adapted from https://stackoverflow.com/a/9158263
@@ -54,8 +55,10 @@
 
 static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
 
+void format_time(char* buf, time_t time);
+
 // buf must be a buffer of at least 30 characters
-void format_time(char* buf);
+void format_current_time(char* buf);
 
 void print_client_connected(char* addr, uint16_t port);
 

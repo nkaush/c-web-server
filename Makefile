@@ -117,5 +117,5 @@ build-release:
 start:
 	docker run -it --rm -p 49500:49500 -v `pwd`:/mount neilk3/linux-dev-env
 
-start-release:
-	docker run -it --rm -p 80:8000 neilk3/web-server
+start-release: build-release
+	docker run -it --rm -p 80:8000 -v `pwd`/favicon.png:/service/favicon.png neilk3/web-server

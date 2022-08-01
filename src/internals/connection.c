@@ -58,7 +58,7 @@ ssize_t connection_read(connection_t* conn) {
         }
     }
 
-    conn->buf_end += bytes_read;
+    conn->buf_end = bytes_read;
     return bytes_read;
 }
 

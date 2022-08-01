@@ -4,20 +4,22 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <stdio.h>
-#include <time.h>
 #include <err.h>
 
 extern int h_errno;
 
-void format_time(char* buf) {
+void format_time(char* buf, time_t time) {
     struct tm gmt;
-    time_t now = time(NULL);
-    strftime(buf, TIME_BUFFER_SIZE, TIME_FMT, gmtime_r(&now, &gmt));
+    strftime(buf, TIME_BUFFER_SIZE, TIME_FMT, gmtime_r(&time, &gmt));
+}
+
+void format_current_time(char* buf) {
+    format_time(buf, time(NULL));
 }
 
 void print_client_connected(char* addr, uint16_t port) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
-    format_time(time_buf);
+    format_current_time(time_buf);
     printf("[%s] %s:%d connected...\n", time_buf, addr, port);
 }
 

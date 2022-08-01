@@ -1,18 +1,11 @@
 #include "response.h"
 #include "internals/format.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <sys/utsname.h>
 #include <time.h>
 #include <err.h>
 
-// Format: (header_name, header_value)
-static const char* HEADER_FMT = "%s: %s\r\n";
-
-// Format: (response_code, response_string, all_headers, response_body)
-// Assumes that headers come with \r\n at the end
-static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
+static char server_os[64] = { 0 };
 
 // Format: (message, status code)
 static const char* JSON_ERROR_CONTENT_FMT = "{\"message\":\"%s\",\"code\":%d}";
@@ -23,10 +16,16 @@ response_t* response_create(http_status status) {
     response->headers = string_to_string_dictionary_create();
 
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
-    format_time(time_buf);
+    format_current_time(time_buf);
+
+    if ( !(*server_os) ) {
+        struct utsname uts;
+        uname(&uts);
+        sprintf(server_os, "kqueue-epoll-server/0.0.1 (%s %s)", uts.sysname, uts.release);
+    }
 
     dictionary_set(response->headers, "Date", time_buf);
-    dictionary_set(response->headers, "Server", "kqueue-server/0.0.1 (MacOS X)");
+    dictionary_set(response->headers, "Server", server_os);
     dictionary_set(response->headers, "Connection", "close");
 
     return response;
@@ -71,7 +70,7 @@ response_t* response_format_error(http_status status, const char* msg) {
 
 response_t* response_bad_request(void) {
     static const char* msg = "The server was unable to process the request";
-    return response_format_error(STATUS_METHOD_NOT_ALLOWED, msg);
+    return response_format_error(STATUS_BAD_REQUEST, msg);
 }
 
 response_t* response_resource_not_found(void) {
@@ -107,54 +106,4 @@ void response_set_content_length(response_t* response, size_t length) {
 
 void response_set_header(response_t* response, const char* key, const char* value) {
     dictionary_set(response->headers, (void*) key, (void*) value);
-}
-
-void infer_content_length(response_t* response) {
-    switch ( response->rt ) {
-        case RT_FILE: {
-            struct stat info = { 0 };
-            if ( fstat(fileno(response->body_content.file), &info) != 0 )
-                err(EXIT_FAILURE, "fstat");
-
-            response_set_content_length(response, (size_t) info.st_size);
-        } break;
-        case RT_STRING:
-            response_set_content_length(response, strlen(response->body_content.body)); break;
-        case RT_EMPTY:
-            response_set_content_length(response, 0); break;
-    }
-}
-
-int response_format_header(response_t* response, char** buffer) {
-    if ( !dictionary_contains(response->headers, "Content-Length") )
-        infer_content_length(response);
-    
-    vector* defined_header_keys = dictionary_keys(response->headers);
-    vector* formatted_headers = string_vector_create();
-    int allocated_space = 1; // allow for NUL-byte at the end
-
-    for (size_t i = 0; i < vector_size(defined_header_keys); ++i) {
-        char* key = vector_get(defined_header_keys, i);
-        char* value = dictionary_get(response->headers, key);
-        char* buffer = NULL;
-        allocated_space += asprintf(&buffer, HEADER_FMT, key, value);
-
-        vector_push_back(formatted_headers, buffer);
-        free(buffer);
-    }
-
-    char* joined_headers = calloc(1, allocated_space);
-    for (size_t i = 0; i < vector_size(formatted_headers); ++i)
-        strcat(joined_headers, vector_get(formatted_headers, i));
-    
-    strcat(joined_headers, "\0");
-
-    const char* status_str = http_status_to_string(response->status);
-    int ret = asprintf(buffer, RESPONSE_HEADER_FMT, response->status, status_str, joined_headers);
-    
-    vector_destroy(defined_header_keys);
-    vector_destroy(formatted_headers);
-    free(joined_headers);
-
-    return ret;
 }

@@ -14,6 +14,14 @@ typedef union _body_content {
     const char* body;
 } body_content_t;
 
+// This struct represents a response to a HTTP request. The server will format
+// the fields in this structure and send the formatted response to the client
+// who made the request that corresponds to this response.
+// 
+// The server will automatically add the following headers to the response: 
+// Date, Server, Connection. If the Content-Length header is not set, then the 
+// server sets the value to the length of the NUL-terminated response body 
+// string. 
 typedef struct _response {
     body_content_t body_content;
     dictionary* headers; // a dictionary of (char*) -> (char*) 
@@ -50,13 +58,6 @@ response_t* response_uri_too_long(void);
 // Response destructor. This does not need to be called by users as it will 
 // automatically be called internally.
 void response_destroy(response_t* response);
-
-// Automatically adds the following headers to the response: Date, Server, Connection
-// If Content-Length is not set, then sets the value to the length of the NUL-
-// terminated response body string. The user must free the memory allocated for 
-// the buffer passed into the function. This function returns the length of the
-// response header string NOT including the NUL-byte at the end.
-int response_format_header(response_t* response, char** buffer);
 
 // Utility function to make it easier to set the Content-Type header
 void response_set_content_type(response_t* response, const char* content_type);
