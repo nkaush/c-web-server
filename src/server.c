@@ -33,7 +33,6 @@ static int server_socket = 0;
 static int was_server_initialized = 0;
 
 static dictionary* routes = NULL;
-static dictionary* connections = NULL;
 
 // Format: (header_name, header_value)
 static const char* HEADER_FMT = "%s: %s\r\n";
@@ -93,13 +92,6 @@ void server_setup_resources(void) {
 #elif defined(__linux__)
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct epoll_event));
 #endif
-    
-    connections = dictionary_create(
-        int_hash_function, int_compare, 
-        int_copy_constructor, int_destructor,
-        connection_init, connection_destroy
-    );
-
     routes = dictionary_create(
         string_hash_function, string_compare,
         string_copy_constructor, string_destructor, 
@@ -143,11 +135,14 @@ int server_handle_new_client(void) {
         c_init.client_fd = client_fd;
         c_init.client_port = htons(client_addr.sin_port);
         c_init.client_address = inet_ntoa(client_addr.sin_addr);
-        dictionary_set(connections, &client_fd, &c_init);
+
+        /// @todo remove dictionary and switch to array or event queue data
+        connection_t* connection = connection_init(&c_init);
+        // dictionary_set(connections, &client_fd, &c_init);
     
 #if defined(__APPLE__)
         struct kevent client_event;
-        EV_SET(&client_event, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_EOF | EV_CLEAR, 0, 0, NULL);
+        EV_SET(&client_event, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_EOF | EV_CLEAR, 0, 0, connection);
 
         if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
@@ -157,6 +152,7 @@ int server_handle_new_client(void) {
 #elif defined(__linux__)
         struct epoll_event event = {0};
         event.data.fd = client_fd;
+        events.data.ptr = connection;
         event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLERR | EPOLLHUP;
 
         if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
@@ -200,6 +196,7 @@ int format_response_header(response_t* response, char** buffer) {
 }
 
 response_t* handle_response_marshalling(request_t* request) {
+    /// @todo make default response handling configurable
     char* requested_route = request->path;
     response_t* response = NULL;
 
@@ -222,79 +219,86 @@ response_t* handle_response_marshalling(request_t* request) {
 }
 
 // Handle an kqueue event from a client connection.
-void server_handle_client(int client_fd, size_t event_data) {
-    connection_t* conn = dictionary_get(connections, &client_fd);
-    if ( conn->state < CS_REQUEST_RECEIVED ) {
-        if ( connection_read(conn) <= 0 ) { return; }
+void server_handle_client(int client_fd, connection_t* connection, size_t event_data) {
+    /// @todo split function into 2 for handling read and handling write
+    if ( connection->state < CS_REQUEST_RECEIVED ) {
+        if ( connection_read(connection) <= 0 ) { return; }
     }
 
-    if ( conn->state == CS_CLIENT_CONNECTED )
-        connection_try_parse_verb(conn);
+    if ( connection->state == CS_CLIENT_CONNECTED )
+        connection_try_parse_verb(connection);
     
-    if ( conn->state == CS_METHOD_PARSED )
-        connection_try_parse_url(conn);
+    if ( connection->state == CS_METHOD_PARSED )
+        connection_try_parse_url(connection);
 
-    if ( conn->state == CS_URL_PARSED ) {
-        connection_try_parse_protocol(conn);
+    if ( connection->state == CS_URL_PARSED ) {
+        connection_try_parse_protocol(connection);
 
-        LOG("[%s] [%s] [%s]", http_method_to_string(conn->request->method), conn->request->path, conn->request->protocol);
+        LOG("[%s] [%s] [%s]", http_method_to_string(connection->request->method), 
+            connection->request->path, connection->request->protocol
+        );
     }
 
-    if ( conn->state == CS_REQUEST_PARSED ) {
-        connection_try_parse_headers(conn);
+    if ( connection->state == CS_REQUEST_PARSED ) {
+        connection_try_parse_headers(connection);
     }
 
-    if ( conn->state == CS_HEADERS_PARSED ) { /// @todo parse request body here
-        conn->state = CS_REQUEST_RECEIVED;
+    if ( connection->state == CS_HEADERS_PARSED ) { 
+        /// @todo parse request body here
+        connection->state = CS_REQUEST_RECEIVED;
     }
 
-    if ( conn->state == CS_REQUEST_RECEIVED ) {
-        conn->response = handle_response_marshalling(conn->request);
-        conn->state = CS_WRITING_RESPONSE_HEADER;
+    if ( connection->state == CS_REQUEST_RECEIVED ) {
+        connection->response = handle_response_marshalling(connection->request);
+        connection->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
         struct kevent change_rd_to_wr, new_wr_event;
         uint16_t flags =  EV_ADD | EV_ENABLE | EV_CLEAR;
-        EV_SET(&change_rd_to_wr, conn->client_fd, EVFILT_WRITE, flags, 0, 0, 0);
+        EV_SET(&change_rd_to_wr, connection->client_fd, EVFILT_WRITE, flags, 0, 0, connection);
 
         if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
 
         LOG("%zu", new_wr_event.data);
         event_data = new_wr_event.data;
+        connection_resize_local_buffer(connection, event_data);
+        connection_resize_sock_send_buf(connection, event_data * 2);
+#elif defined(__linux__)
+        /// @todo implement
 #endif
     }
 
-    if ( conn->state == CS_WRITING_RESPONSE_HEADER ) {
+    if ( connection->state == CS_WRITING_RESPONSE_HEADER ) {
         /// @todo format and send the conn->response field here
         /// maybe create another enum and split the sending of the response header and response content?
          
         char* header_str = NULL;
-        int header_len = format_response_header(conn->response, &header_str);
+        int header_len = format_response_header(connection->response, &header_str);
         
         write_all_to_socket(client_fd, header_str, header_len);
 
         free(header_str);
-        conn->state = CS_WRITING_RESPONSE_BODY;
-        sscanf(dictionary_get(conn->response->headers, "Content-Length"), "%zu", &conn->bytes_to_transmit);
+        connection->state = CS_WRITING_RESPONSE_BODY;
+        sscanf(dictionary_get(connection->response->headers, "Content-Length"), "%zu", &connection->bytes_to_transmit);
     }
 
-    if ( conn->state == CS_WRITING_RESPONSE_BODY ) {
-        if ( !connection_try_send_response_body(conn, event_data) ) {
-            const char* http_method_str = http_method_to_string(conn->request->method);
-            const char* http_status_str = http_status_to_string(conn->response->status);
+    if ( connection->state == CS_WRITING_RESPONSE_BODY ) {
+        if ( !connection_try_send_response_body(connection, event_data) ) {
+            const char* http_method_str = http_method_to_string(connection->request->method);
+            const char* http_status_str = http_status_to_string(connection->response->status);
 
             print_client_request_resolution(
-                conn->client_address, conn->client_port, http_method_str, 
-                conn->request->path, conn->request->protocol, conn->response->status, 
-                http_status_str, conn->bytes_to_transmit, &conn->time_received
+                connection->client_address, connection->client_port, http_method_str, 
+                connection->request->path, connection->request->protocol, connection->response->status, 
+                http_status_str, connection->bytes_to_transmit, &connection->time_received
             );
 
 #if defined(__linux__)
             if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
                 perror("epoll_ctl EPOLL_CTL_DEL");
 #endif
-            dictionary_remove(connections, &client_fd);
+            connection_destroy(connection);
         }
     }
 }
@@ -302,9 +306,6 @@ void server_handle_client(int client_fd, size_t event_data) {
 // Cleanup the resources used by the server. Called on program exit.
 void server_cleanup(void) {
     LOG("Exiting server...");
-    if ( connections )
-        dictionary_destroy(connections);
-
     if ( routes )
         dictionary_destroy(routes);
 
@@ -368,16 +369,23 @@ void server_launch(void) {
         for(int i = 0 ; i < num_events; i++) {
 #if defined(__APPLE__)
             int fd = events_array[i].ident;
+            connection_t* connection = events_array[i].udata;
             // events_array[i].data;
 #elif defined(__linux__)
             int fd = events_array[i].data.fd;
+            connection_t* connection = events_array[i].data.ptr;
             // events_array[i].events;
 #endif     
             if (fd == server_socket) { 
                 // we have a new connection to the server
                 server_handle_new_client();
             } else if (fd > 0) {
-                server_handle_client(fd, events_array[i].data);
+                // int n;
+                // unsigned int m = sizeof(n);
+                // getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void*) &n, &m);
+
+                // LOG("kqueue: %ld", events_array[i].data);
+                server_handle_client(fd, connection, events_array[i].data);
             }
         }
     }

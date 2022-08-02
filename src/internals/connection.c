@@ -1,5 +1,6 @@
 #include "internals/connection.h"
 #include "internals/format.h"
+#include <sys/socket.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -7,7 +8,9 @@
 #include <err.h>
 
 // #define BUFFER_SIZE 8192
-#define BUFFER_SIZE 16384
+// #define BUFFER_SIZE 16384
+// #define BUFFER_SIZE 32768
+#define DEFAULT_BUFFER_SIZE 65536
 
 void* connection_init(void* ptr) {
     connection_initializer_t* c = (connection_initializer_t*) ptr;
@@ -16,7 +19,8 @@ void* connection_init(void* ptr) {
     this->state = CS_CLIENT_CONNECTED;
     clock_gettime(CLOCK_REALTIME, &this->time_received);
 
-    this->buf = calloc(BUFFER_SIZE, sizeof(char));
+    this->buf = calloc(DEFAULT_BUFFER_SIZE, sizeof(char));
+    this->buffer_size = DEFAULT_BUFFER_SIZE;
     this->buf_end = 0;
     this->buf_ptr = 0;
 
@@ -54,9 +58,7 @@ void connection_destroy(void* ptr) {
 
 ssize_t connection_read(connection_t* conn) {
     ssize_t bytes_read = read(
-        conn->client_fd, 
-        conn->buf + conn->buf_end, 
-        BUFFER_SIZE - conn->buf_end
+        conn->client_fd, conn->buf + conn->buf_end, conn->buffer_size - conn->buf_end
     );
 
     // adapted from: https://github.com/eliben/code-for-blog/blob/master/2017/async-socket-server/epoll-server.c
@@ -77,6 +79,24 @@ void connection_shift_buffer(connection_t* conn) {
     memmove(conn->buf, conn->buf + conn->buf_ptr, conn->buf_end - conn->buf_ptr);
     conn->buf_end -= conn->buf_ptr;
     conn->buf_ptr = 0;
+}
+
+void connection_resize_local_buffer(connection_t* conn, size_t buffer_size) {
+    if ( conn->buffer_size < buffer_size ) {
+        LOG("resize local buffer to %zu", buffer_size);
+        conn->buffer_size = buffer_size;
+        conn->buf = realloc(conn->buf, conn->buffer_size);
+    }
+}
+
+void connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size) {
+    LOG("resize rcv buffer to %zu", buffer_size);
+    setsockopt(conn->client_fd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
+}
+
+void connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size) {
+    LOG("resize send buffer to %zu", buffer_size);
+    setsockopt(conn->client_fd, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
 }
 
 void connection_try_parse_verb(connection_t* conn) {
@@ -191,7 +211,7 @@ void connection_try_parse_headers(connection_t* conn) {
 int connection_try_send_response_body(connection_t* conn, size_t max_receivable) {
     /// @todo handle RT_EMPTY
     response_t* response = conn->response;
-    size_t to_send = MIN(BUFFER_SIZE, conn->bytes_to_transmit - conn->bytes_transmitted);
+    size_t to_send = MIN(conn->buffer_size, conn->bytes_to_transmit - conn->bytes_transmitted);
     to_send = MIN(to_send, max_receivable);
 
     if ( response->rt == RT_FILE ) {
@@ -215,6 +235,7 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
         LOG("(fd=%d) write_all_to_socket() returned with code 0", conn->client_fd);
         return 0;
     } else {
+        LOG("sent %zd bytes", return_code);
         conn->bytes_transmitted += return_code;
         return 1;
     }

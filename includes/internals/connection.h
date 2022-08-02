@@ -28,6 +28,7 @@ typedef struct _connection {
     response_t* response;
     char* client_address;
     char* buf;
+    size_t buffer_size;
     size_t bytes_to_transmit;
     size_t bytes_transmitted;
     connection_state state;    
@@ -50,6 +51,12 @@ void connection_destroy(void* ptr);
 ssize_t connection_read(connection_t* conn);
 
 void connection_shift_buffer(connection_t* conn);
+
+void connection_resize_local_buffer(connection_t* conn, size_t buffer_size);
+
+void connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size);
+
+void connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size);
 
 // Attempt to parse the http_method in a header received from a client.
 void connection_try_parse_verb(connection_t* conn);

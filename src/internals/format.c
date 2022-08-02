@@ -51,11 +51,18 @@ void print_client_request_resolution(
         color = BOLDMAGENTA;
     } 
 
+    // (bytes / 1000000) / (Download Speed In Megabits / 8) = time
+    // (bytes / 1000000) / time = (Download Speed In Megabits / 8)
+    // (bytes * 8) / (1000000 * time) = speed
+
+    double speed = (content_len * 8) / duration;
+    speed /= 1000000;
+
     printf(
         "INFO [%s] [access] %s:%d \"%s %s %s\" -- %s%d %s "RESET
-        "[%zu bytes sent] [%fs]\n", 
+        "[%zu bytes sent] [%fs] [%f Mbps]\n", 
         time_buf, addr, port, method, route, protocol, color,
-        status, status_str, content_len, duration
+        status, status_str, content_len, duration, speed
     );
 }
 

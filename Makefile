@@ -17,7 +17,9 @@ WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarati
 INC = -I./includes/
 CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
-CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
+CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
+
+LDFLAGS_DEBUG = -pg
 
 # Find object files for libraries
 LIBS_SRC_FILES:=$(wildcard $(LIBS_SRC_DIR)/*.c)
@@ -86,10 +88,10 @@ $(OBJS_DIR)/%-debug.o: $(TEST_DIR)/%.c | $(OBJS_DIR)
 
 # exes
 $(EXE_SERVER): $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-release.o)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ -o $@
 
 $(EXE_SERVER)-debug: $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ $(LDFLAGS_DEBUG) -o $@
 
 $(EXE_CLIENT): $(OBJS_CLIENT:%.o=$(OBJS_DIR)/%-release.o)
 	$(LD) $^ -o $@
@@ -119,3 +121,6 @@ start:
 
 start-release: build-release
 	docker run -it --rm -p 80:8000 -v `pwd`/favicon.png:/service/favicon.png neilk3/web-server
+
+trace: debug
+	sudo dtrace -s timing.d -c "./server-debug 80"

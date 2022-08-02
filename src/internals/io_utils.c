@@ -151,9 +151,16 @@ void make_socket_non_blocking(int fd) {
         err(EXIT_FAILURE, "fcntl F_SETFL O_NONBLOCK");
 }
 
-int num_bytes_in_socket(int fd) {
+int num_bytes_in_rd_socket(int fd) {
     int count;
     ioctl(fd, FIONREAD, &count);
+
+    return count;
+}
+
+int num_bytes_in_wr_socket(int fd) {
+    int count;
+    ioctl(fd, _IOR('f', 120, int), &count);
 
     return count;
 }
