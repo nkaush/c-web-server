@@ -1,14 +1,16 @@
 #include "internals/connection.h"
+#include "internals/format.h"
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <err.h>
 
-#define BUFFER_SIZE 4096
+// #define BUFFER_SIZE 8192
+#define BUFFER_SIZE 16384
 
 void* connection_init(void* ptr) {
-    int client_fd = *((int*) ptr);
+    connection_initializer_t* c = (connection_initializer_t*) ptr;
 
     connection_t* this = malloc(sizeof(connection_t));
     this->state = CS_CLIENT_CONNECTED;
@@ -18,9 +20,15 @@ void* connection_init(void* ptr) {
     this->buf_end = 0;
     this->buf_ptr = 0;
 
-    this->client_fd = client_fd;
+    this->bytes_to_transmit = 0;
+    this->bytes_transmitted = 0;
+
     this->response = NULL;
     this->request = NULL;
+
+    this->client_address = strdup(c->client_address);
+    this->client_port = c->client_port;
+    this->client_fd = c->client_fd;
 
     return (void*) this;
 }
@@ -36,6 +44,9 @@ void connection_destroy(void* ptr) {
 
     if ( this->response )
         response_destroy(this->response);
+
+    if ( this->client_address )
+        free(this->client_address);
 
     close(this->client_fd);
     free(this);
@@ -119,7 +130,7 @@ void connection_try_parse_url(connection_t* conn) {
     size_t length = (size_t) idx_space - (size_t) url_start;
 
     if ( length >= MAX_URL_LENGTH ) {
-        conn->state = CS_WRITING_RESPONSE;
+        conn->state = CS_WRITING_RESPONSE_HEADER;
         conn->response = response_uri_too_long();
         return;
     }
@@ -174,4 +185,37 @@ void connection_try_parse_headers(connection_t* conn) {
     }
 
     conn->state = CS_HEADERS_PARSED;
+}
+
+// @return -1 if there was an error, 1 if the request is ongoing, 0 if the request is complete
+int connection_try_send_response_body(connection_t* conn, size_t max_receivable) {
+    /// @todo handle RT_EMPTY
+    response_t* response = conn->response;
+    size_t to_send = MIN(BUFFER_SIZE, conn->bytes_to_transmit - conn->bytes_transmitted);
+    to_send = MIN(to_send, max_receivable);
+
+    if ( response->rt == RT_FILE ) {
+        fread(conn->buf, sizeof(char), to_send, response->body_content.file);
+    } else if ( response->rt == RT_STRING ) {
+        memcpy(conn->buf, conn->response->body_content.body, to_send);
+    }
+    
+    ssize_t return_code = 
+        write_all_to_socket(conn->client_fd, conn->buf, to_send);
+    
+    if (return_code < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            LOG("(fd=%d) write_all_to_socket() returned with code -1 and EAGAIN/EWOULDBLOCK", conn->client_fd);
+        } else {
+            LOG("(fd=%d) write_all_to_socket() returned with code -1", conn->client_fd);
+            connection_destroy(conn);
+        }
+        return -1;
+    } else if (return_code == 0) {
+        LOG("(fd=%d) write_all_to_socket() returned with code 0", conn->client_fd);
+        return 0;
+    } else {
+        conn->bytes_transmitted += return_code;
+        return 1;
+    }
 }

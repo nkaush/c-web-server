@@ -51,6 +51,11 @@ void format_current_time(char* buf);
 
 void print_client_connected(char* addr, uint16_t port);
 
+void print_client_request_resolution(
+    const char* addr, uint16_t port, const char* method, const char* route,
+    const char* protocol, int status, const char* status_str, size_t content_len, 
+    struct timespec* start);
+
 void print_server_details(char* port);
 
 void print_server_ready(void);

@@ -72,3 +72,5 @@ typedef enum _http_status {
 const char* http_method_to_string(http_method method);
 
 const char* http_status_to_string(http_status status);
+
+int url_decode(char* out, const char* in);

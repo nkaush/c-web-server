@@ -139,11 +139,15 @@ int server_handle_new_client(void) {
             errx(EXIT_FAILURE, "client_fd (%d) >= MAX_FILE_DESCRIPTORS (%d)", client_fd, MAX_FILE_DESCRIPTORS);
 
         make_socket_non_blocking(client_fd);
-        dictionary_set(connections, &client_fd, &client_fd);
+        connection_initializer_t c_init = { 0 };
+        c_init.client_fd = client_fd;
+        c_init.client_port = htons(client_addr.sin_port);
+        c_init.client_address = inet_ntoa(client_addr.sin_addr);
+        dictionary_set(connections, &client_fd, &c_init);
     
 #if defined(__APPLE__)
         struct kevent client_event;
-        EV_SET(&client_event, client_fd, EVFILT_READ | EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, NULL);
+        EV_SET(&client_event, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_EOF | EV_CLEAR, 0, 0, NULL);
 
         if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
@@ -158,9 +162,7 @@ int server_handle_new_client(void) {
         if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
             perror("epoll_ctl EPOLL_CTL_ADD");
 #endif
-        char* client_addr_str = inet_ntoa(client_addr.sin_addr);
-        uint16_t client_port = htons(client_addr.sin_port);
-        print_client_connected(client_addr_str, client_port);
+        print_client_connected(c_init.client_address, c_init.client_port);
 
         return client_fd;
     }
@@ -220,9 +222,11 @@ response_t* handle_response_marshalling(request_t* request) {
 }
 
 // Handle an kqueue event from a client connection.
-void server_handle_client(int client_fd) {
+void server_handle_client(int client_fd, size_t event_data) {
     connection_t* conn = dictionary_get(connections, &client_fd);
-    if ( connection_read(conn) <= 0 ) { return; }
+    if ( conn->state < CS_REQUEST_RECEIVED ) {
+        if ( connection_read(conn) <= 0 ) { return; }
+    }
 
     if ( conn->state == CS_CLIENT_CONNECTED )
         connection_try_parse_verb(conn);
@@ -236,44 +240,62 @@ void server_handle_client(int client_fd) {
         LOG("[%s] [%s] [%s]", http_method_to_string(conn->request->method), conn->request->path, conn->request->protocol);
     }
 
-    if ( conn->state == CS_REQUEST_PARSED ) /// @todo parse request body here
+    if ( conn->state == CS_REQUEST_PARSED ) {
         connection_try_parse_headers(conn);
+    }
 
-    if ( conn->state == CS_HEADERS_PARSED ) { 
+    if ( conn->state == CS_HEADERS_PARSED ) { /// @todo parse request body here
         conn->state = CS_REQUEST_RECEIVED;
     }
 
     if ( conn->state == CS_REQUEST_RECEIVED ) {
         conn->response = handle_response_marshalling(conn->request);
-        conn->state = CS_WRITING_RESPONSE;
+        conn->state = CS_WRITING_RESPONSE_HEADER;
+
+#if defined(__APPLE__)
+        struct kevent change_rd_to_wr, new_wr_event;
+        uint16_t flags =  EV_ADD | EV_ENABLE | EV_CLEAR;
+        EV_SET(&change_rd_to_wr, conn->client_fd, EVFILT_WRITE, flags, 0, 0, 0);
+
+        if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
+            err(EXIT_FAILURE, "kevent register");
+
+        LOG("%zu", new_wr_event.data);
+        event_data = new_wr_event.data;
+#endif
     }
 
-    if ( conn->state == CS_WRITING_RESPONSE ) {
+    if ( conn->state == CS_WRITING_RESPONSE_HEADER ) {
         /// @todo format and send the conn->response field here
         /// maybe create another enum and split the sending of the response header and response content?
          
         char* header_str = NULL;
         int header_len = format_response_header(conn->response, &header_str);
-        LOG("[%s]", header_str);
+        
         write_all_to_socket(client_fd, header_str, header_len);
 
-        size_t body_len = 0;
-        sscanf(dictionary_get(conn->response->headers, "Content-Length"), "%zu", &body_len);
-
-        if ( conn->response->rt == RT_FILE ) {
-            buffered_write_to_socket(conn->client_fd, conn->response->body_content.file, body_len);
-        } else if (conn->response->rt == RT_STRING) {
-            write_all_to_socket(client_fd, conn->response->body_content.body, body_len);
-        }
-
         free(header_str);
+        conn->state = CS_WRITING_RESPONSE_BODY;
+        sscanf(dictionary_get(conn->response->headers, "Content-Length"), "%zu", &conn->bytes_to_transmit);
+    }
+
+    if ( conn->state == CS_WRITING_RESPONSE_BODY ) {
+        if ( !connection_try_send_response_body(conn, event_data) ) {
+            const char* http_method_str = http_method_to_string(conn->request->method);
+            const char* http_status_str = http_status_to_string(conn->response->status);
+
+            print_client_request_resolution(
+                conn->client_address, conn->client_port, http_method_str, 
+                conn->request->path, conn->request->protocol, conn->response->status, 
+                http_status_str, conn->bytes_to_transmit, &conn->time_received
+            );
 
 #if defined(__linux__)
-        if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
-            perror("epoll_ctl EPOLL_CTL_DEL");
+            if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
+                perror("epoll_ctl EPOLL_CTL_DEL");
 #endif
-
-        dictionary_remove(connections, &client_fd);
+            dictionary_remove(connections, &client_fd);
+        }
     }
 }
 
@@ -296,7 +318,7 @@ void server_init(char* port) {
     if ( was_server_initialized )
         errx(EXIT_FAILURE, "Cannot initialize server twice");
 
-    else if ( !port ) 
+    if ( !port ) 
         errx(EXIT_FAILURE, "Cannot bind to NULL port");
 
     was_server_initialized = 1;
@@ -355,7 +377,7 @@ void server_launch(void) {
                 // we have a new connection to the server
                 server_handle_new_client();
             } else if (fd > 0) {
-                server_handle_client(fd);
+                server_handle_client(fd, events_array[i].data);
             }
         }
     }

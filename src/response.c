@@ -8,6 +8,13 @@
 
 static char server_os[64] = { 0 };
 
+static char* DATE_HEADER_KEY = "Date";
+static char* SERVER_HEADER_KEY = "Server";
+static char* CONNECTION_HEADER_KEY = "Connection";
+static char* CONTENT_TYPE_HEADER_KEY = "Content-Type";
+static char* CONTENT_LENGTH_HEADER_KEY = "Content-Length";
+static char* LAST_MODIFIED_HEADER_KEY = "Last-Modified";
+
 // Format: (message, status code)
 static const char* JSON_ERROR_CONTENT_FMT = "{\"message\":\"%s\",\"code\":%d}";
 
@@ -22,12 +29,14 @@ response_t* response_create(http_status status) {
     if ( !(*server_os) ) {
         struct utsname uts;
         uname(&uts);
-        sprintf(server_os, "kqueue-epoll-server/0.0.1 (%s %s)", uts.sysname, uts.release);
+        sprintf(server_os, "kqueue-epoll/0.0.1 (%s %s)", uts.sysname, uts.release);
     }
 
-    dictionary_set(response->headers, "Date", time_buf);
-    dictionary_set(response->headers, "Server", server_os);
-    dictionary_set(response->headers, "Connection", "close");
+    dictionary_set(response->headers, DATE_HEADER_KEY, time_buf);
+    dictionary_set(response->headers, SERVER_HEADER_KEY, server_os);
+
+    /// @todo make this dynamic
+    dictionary_set(response->headers, CONNECTION_HEADER_KEY, "close");
 
     return response;
 }
@@ -58,7 +67,7 @@ response_t* response_from_file(http_status status, FILE* file) {
 #elif defined(__linux__)
     format_time(time_buf, info.st_mtim.tv_sec);
 #endif
-    dictionary_set(response->headers, "Last-Modified", time_buf);
+    dictionary_set(response->headers, LAST_MODIFIED_HEADER_KEY, time_buf);
     response_set_content_length(response, (size_t) info.st_size);
     
     return response;
@@ -115,13 +124,13 @@ response_t* response_uri_too_long(void) {
 }
 
 void response_set_content_type(response_t* response, const char* content_type) {
-    dictionary_set(response->headers, "Content-Type", (void*) content_type);
+    dictionary_set(response->headers, CONTENT_TYPE_HEADER_KEY, (void*) content_type);
 }
 
 void response_set_content_length(response_t* response, size_t length) {
     char* buf = NULL;
     asprintf(&buf, "%zu", length);
-    dictionary_set(response->headers, "Content-Length", buf);
+    dictionary_set(response->headers, CONTENT_LENGTH_HEADER_KEY, buf);
     free(buf);
 }
 

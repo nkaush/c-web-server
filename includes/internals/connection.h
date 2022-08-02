@@ -4,6 +4,12 @@
 #include "response.h"
 #include "request.h"
 
+typedef struct _connection_initializer {
+    char* client_address;
+    int client_fd;
+    uint16_t client_port;
+} connection_initializer_t;
+
 // This enum indicates the state of a connection.
 typedef enum _connection_state {
     CS_CLIENT_CONNECTED,
@@ -12,22 +18,25 @@ typedef enum _connection_state {
     CS_REQUEST_PARSED,
     CS_HEADERS_PARSED,
     CS_REQUEST_RECEIVED,
-    CS_WRITING_RESPONSE
+    CS_WRITING_RESPONSE_HEADER,
+    CS_WRITING_RESPONSE_BODY
 } connection_state;
 
 // This data structure keeps track of a connection to a client.
 typedef struct _connection {
     request_t* request;
     response_t* response;
+    char* client_address;
     char* buf;
+    size_t bytes_to_transmit;
+    size_t bytes_transmitted;
     connection_state state;    
     int client_fd;
     int buf_end;
     int buf_ptr;
+    uint16_t client_port; 
     struct timespec time_received;
     // body_bytes_received
-    // size_t bytes_to_transmit;
-    // size_t bytes_transmitted;
 } connection_t;
 
 // Initialize a connection data structure and save to the global connections 
@@ -56,3 +65,5 @@ void connection_try_parse_protocol(connection_t* conn);
 
 // Attempt to parse the request headers received from a client.
 void connection_try_parse_headers(connection_t* conn);
+
+int connection_try_send_response_body(connection_t* conn, size_t max_receivable);
