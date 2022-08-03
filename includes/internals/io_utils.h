@@ -67,9 +67,17 @@ void make_socket_non_blocking(int fd);
 int num_bytes_in_rd_socket(int fd);
 
 /**
- * @brief Check if a socket has capacity to write.
+ * @brief Get the number of unsent bytes in the socket.
  * 
  * @param fd the socket to check
  * @return the number of bytes available.
  */
 int num_bytes_in_wr_socket(int fd);
+
+/**
+ * @brief Get the number of bytes we can send to the socket.
+ * 
+ * @param fd the socket to check
+ * @return the number of bytes we can send.
+ */
+int free_bytes_in_wr_socket(int fd);

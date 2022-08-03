@@ -17,9 +17,10 @@ WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarati
 INC = -I./includes/
 CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
-CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
+CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 
-LDFLAGS_DEBUG = -pg
+# CFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
+# LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 
 # Find object files for libraries
 LIBS_SRC_FILES:=$(wildcard $(LIBS_SRC_DIR)/*.c)
@@ -116,11 +117,14 @@ build:
 build-release:
 	docker build -t neilk3/web-server -f Dockerfile.release .
 
-start:
-	docker run -it --rm -p 80:49500 -v `pwd`:/mount neilk3/linux-dev-env
+start: build
+	docker run -it --rm -p 80:8000 -v `pwd`:/mount neilk3/linux-dev-env
 
 start-release: build-release
 	docker run -it --rm -p 80:8000 -v `pwd`/favicon.png:/service/favicon.png neilk3/web-server
 
 trace: debug
 	sudo dtrace -s timing.d -c "./server-debug 80"
+
+valgrind: server-debug
+	valgrind --leak-check=full --show-leak-kinds=all ./server-debug 8000

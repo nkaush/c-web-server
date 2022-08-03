@@ -1,4 +1,5 @@
 #pragma once
+#include <inttypes.h>
 #include <time.h>
 #include "internals/io_utils.h"
 #include "response.h"

@@ -10,7 +10,9 @@
 // #define BUFFER_SIZE 8192
 // #define BUFFER_SIZE 16384
 // #define BUFFER_SIZE 32768
-#define DEFAULT_BUFFER_SIZE 65536
+#define DEFAULT_RD_BUFFER_SIZE 1UL << 13UL
+#define DEFAULT_BUFFER_SIZE 1UL << 16UL
+#define MAX_BUFFER_SIZE 1UL << 18UL
 
 void* connection_init(void* ptr) {
     connection_initializer_t* c = (connection_initializer_t*) ptr;
@@ -19,8 +21,8 @@ void* connection_init(void* ptr) {
     this->state = CS_CLIENT_CONNECTED;
     clock_gettime(CLOCK_REALTIME, &this->time_received);
 
-    this->buf = calloc(DEFAULT_BUFFER_SIZE, sizeof(char));
-    this->buffer_size = DEFAULT_BUFFER_SIZE;
+    this->buf = calloc(DEFAULT_RD_BUFFER_SIZE, sizeof(char));
+    this->buffer_size = DEFAULT_RD_BUFFER_SIZE;
     this->buf_end = 0;
     this->buf_ptr = 0;
 
@@ -83,6 +85,7 @@ void connection_shift_buffer(connection_t* conn) {
 
 void connection_resize_local_buffer(connection_t* conn, size_t buffer_size) {
     if ( conn->buffer_size < buffer_size ) {
+        buffer_size = MIN(MAX_BUFFER_SIZE, buffer_size);
         LOG("resize local buffer to %zu", buffer_size);
         conn->buffer_size = buffer_size;
         conn->buf = realloc(conn->buf, conn->buffer_size);
@@ -179,6 +182,7 @@ void connection_try_parse_protocol(connection_t* conn) {
 }
 
 void connection_try_parse_headers(connection_t* conn) {
+    /// @todo return 413 if headers are too long (i.e. no \r\n\r\n)
     static const char* HEADER_SEP = ": ";
     static const char* EMPTY_HEADER_KEY = "";
 
@@ -235,7 +239,7 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
         LOG("(fd=%d) write_all_to_socket() returned with code 0", conn->client_fd);
         return 0;
     } else {
-        LOG("sent %zd bytes", return_code);
+        // LOG("sent %zd bytes", return_code);
         conn->bytes_transmitted += return_code;
         return 1;
     }

@@ -1,9 +1,9 @@
 #include "server.h"
 #include <err.h>
 
+#ifdef __APPLE__
 static char* program_name;
 
-#ifdef __APPLE__
 void check_leaks(void) {
     char cmd[100];
     sprintf(cmd, "export MallocStackLogging=1 && leaks %s", program_name + 2);

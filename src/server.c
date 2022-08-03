@@ -34,13 +34,6 @@ static int was_server_initialized = 0;
 
 static dictionary* routes = NULL;
 
-// Format: (header_name, header_value)
-static const char* HEADER_FMT = "%s: %s\r\n";
-
-// Format: (response_code, response_string, all_headers, response_body)
-// Assumes that headers come with \r\n at the end
-static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
-
 // Configure the server socket.
 void server_setup_socket(char* port) {
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -135,10 +128,7 @@ int server_handle_new_client(void) {
         c_init.client_fd = client_fd;
         c_init.client_port = htons(client_addr.sin_port);
         c_init.client_address = inet_ntoa(client_addr.sin_addr);
-
-        /// @todo remove dictionary and switch to array or event queue data
         connection_t* connection = connection_init(&c_init);
-        // dictionary_set(connections, &client_fd, &c_init);
     
 #if defined(__APPLE__)
         struct kevent client_event;
@@ -151,12 +141,12 @@ int server_handle_new_client(void) {
             errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
 #elif defined(__linux__)
         struct epoll_event event = {0};
-        event.data.fd = client_fd;
-        events.data.ptr = connection;
+        LOG("creating epoll event for fd=%d", client_fd);
+        event.data.ptr = connection;
         event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLERR | EPOLLHUP;
 
         if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
-            perror("epoll_ctl EPOLL_CTL_ADD");
+            err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_ADD");
 #endif
         print_client_connected(c_init.client_address, c_init.client_port);
 
@@ -165,6 +155,9 @@ int server_handle_new_client(void) {
 }
 
 int format_response_header(response_t* response, char** buffer) {
+    static const char* HEADER_FMT = "%s: %s\r\n";
+    static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
+
     vector* defined_header_keys = dictionary_keys(response->headers);
     vector* formatted_headers = string_vector_create();
     int allocated_space = 1; // allow for NUL-byte at the end
@@ -219,10 +212,11 @@ response_t* handle_response_marshalling(request_t* request) {
 }
 
 // Handle an kqueue event from a client connection.
-void server_handle_client(int client_fd, connection_t* connection, size_t event_data) {
+void server_handle_client(connection_t* connection, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
     if ( connection->state < CS_REQUEST_RECEIVED ) {
         if ( connection_read(connection) <= 0 ) { return; }
+        LOG("%s", connection->buf);
     }
 
     if ( connection->state == CS_CLIENT_CONNECTED )
@@ -262,21 +256,23 @@ void server_handle_client(int client_fd, connection_t* connection, size_t event_
 
         LOG("%zu", new_wr_event.data);
         event_data = new_wr_event.data;
-        connection_resize_local_buffer(connection, event_data);
-        connection_resize_sock_send_buf(connection, event_data * 2);
-#elif defined(__linux__)
-        /// @todo implement
 #endif
+        /// @todo https://www.netmeister.org/blog/ipcbufs.html#:~:text=That%27s%20right%3A%20when,for%20normal%20users).
+        
+        LOG("before=%d (change to %zu * 3 = %zu)", free_bytes_in_wr_socket(connection->client_fd), event_data, event_data * 3);
+        connection_resize_sock_send_buf(connection, event_data * 2);
+
+        int new_snd_buf_size = free_bytes_in_wr_socket(connection->client_fd);
+        LOG("after=%d", new_snd_buf_size);
+
+        connection_resize_local_buffer(connection, new_snd_buf_size);
     }
 
-    if ( connection->state == CS_WRITING_RESPONSE_HEADER ) {
-        /// @todo format and send the conn->response field here
-        /// maybe create another enum and split the sending of the response header and response content?
-         
+    if ( connection->state == CS_WRITING_RESPONSE_HEADER ) {         
         char* header_str = NULL;
         int header_len = format_response_header(connection->response, &header_str);
         
-        write_all_to_socket(client_fd, header_str, header_len);
+        write_all_to_socket(connection->client_fd, header_str, header_len);
 
         free(header_str);
         connection->state = CS_WRITING_RESPONSE_BODY;
@@ -295,8 +291,8 @@ void server_handle_client(int client_fd, connection_t* connection, size_t event_
             );
 
 #if defined(__linux__)
-            if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, conn->client_fd, NULL) < 0)
-                perror("epoll_ctl EPOLL_CTL_DEL");
+            if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, connection->client_fd, NULL) < 0)
+                err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif
             connection_destroy(connection);
         }
@@ -369,23 +365,22 @@ void server_launch(void) {
         for(int i = 0 ; i < num_events; i++) {
 #if defined(__APPLE__)
             int fd = events_array[i].ident;
-            connection_t* connection = events_array[i].udata;
-            // events_array[i].data;
 #elif defined(__linux__)
             int fd = events_array[i].data.fd;
-            connection_t* connection = events_array[i].data.ptr;
-            // events_array[i].events;
-#endif     
+#endif
             if (fd == server_socket) { 
                 // we have a new connection to the server
                 server_handle_new_client();
-            } else if (fd > 0) {
-                // int n;
-                // unsigned int m = sizeof(n);
-                // getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void*) &n, &m);
-
-                // LOG("kqueue: %ld", events_array[i].data);
-                server_handle_client(fd, connection, events_array[i].data);
+            } else {
+#if defined(__APPLE__)
+                connection_t* connection = events_array[i].udata;
+                size_t event_data = events_array[i].data;
+#elif defined(__linux__)
+                connection_t* connection = events_array[i].data.ptr;
+                size_t event_data = free_bytes_in_wr_socket(connection->client_fd);
+#endif
+                LOG("kqueue: %ld", event_data);
+                server_handle_client(connection, event_data);
             }
         }
     }
