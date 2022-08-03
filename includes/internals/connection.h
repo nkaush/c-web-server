@@ -29,15 +29,18 @@ typedef struct _connection {
     response_t* response;
     char* client_address;
     char* buf;
-    size_t buffer_size;
-    size_t bytes_to_transmit;
-    size_t bytes_transmitted;
+    size_t buf_size;
+    size_t body_bytes_to_transmit;
+    size_t body_bytes_transmitted;
+    size_t body_bytes_to_receive;
+    size_t body_bytes_received;
     connection_state state;    
     int client_fd;
     int buf_end;
     int buf_ptr;
-    uint16_t client_port; 
     struct timespec time_received;
+    uint16_t client_port; 
+    uint8_t body_length_parsed;
     // body_bytes_received
 } connection_t;
 
@@ -73,5 +76,7 @@ void connection_try_parse_protocol(connection_t* conn);
 
 // Attempt to parse the request headers received from a client.
 void connection_try_parse_headers(connection_t* conn);
+
+void connection_read_request_body(connection_t* conn);
 
 int connection_try_send_response_body(connection_t* conn, size_t max_receivable);

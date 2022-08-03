@@ -103,6 +103,11 @@ response_t* response_format_error(http_status status, const char* msg) {
     return response;
 }
 
+response_t* response_malformed_request(void) {
+    static const char* msg = "The client has issued a malformed or illegal request, and the server was unable to process it";
+    return response_format_error(STATUS_BAD_REQUEST, msg);
+}
+
 response_t* response_bad_request(void) {
     static const char* msg = "The server was unable to process the request";
     return response_format_error(STATUS_BAD_REQUEST, msg);
@@ -116,6 +121,11 @@ response_t* response_resource_not_found(void) {
 response_t* response_method_not_allowed(void) {
     static const char* msg = "The request method is inappropriate for the requested resource";
     return response_format_error(STATUS_METHOD_NOT_ALLOWED, msg);
+}
+
+response_t* response_length_required(void) {
+    static const char* msg = "The Content-Length header is required";
+    return response_format_error(STATUS_LENGTH_REQUIRED, msg);
 }
 
 response_t* response_uri_too_long(void) {

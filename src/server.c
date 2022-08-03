@@ -188,13 +188,13 @@ int format_response_header(response_t* response, char** buffer) {
     return ret;
 }
 
-response_t* handle_response_marshalling(request_t* request) {
+response_t* handle_response(request_t* request) {
     /// @todo make default response handling configurable
     char* requested_route = request->path;
     response_t* response = NULL;
 
     if ( request->method == HTTP_UNKNOWN ) {
-        response = response_bad_request();
+        response = response_malformed_request();
     } else if ( !dictionary_contains(routes, requested_route) ) {
         response = response_resource_not_found();
     } else {
@@ -235,15 +235,15 @@ void server_handle_client(connection_t* connection, size_t event_data) {
 
     if ( connection->state == CS_REQUEST_PARSED ) {
         connection_try_parse_headers(connection);
+        connection_shift_buffer(connection);
+        LOG("[%s] [%d, %d]", connection->buf, connection->buf_ptr, connection->buf_end);
     }
 
-    if ( connection->state == CS_HEADERS_PARSED ) { 
-        /// @todo parse request body here
-        connection->state = CS_REQUEST_RECEIVED;
-    }
+    if ( connection->state == CS_HEADERS_PARSED )
+        connection_read_request_body(connection);
 
     if ( connection->state == CS_REQUEST_RECEIVED ) {
-        connection->response = handle_response_marshalling(connection->request);
+        connection->response = handle_response(connection->request);
         connection->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
@@ -276,7 +276,7 @@ void server_handle_client(connection_t* connection, size_t event_data) {
 
         free(header_str);
         connection->state = CS_WRITING_RESPONSE_BODY;
-        sscanf(dictionary_get(connection->response->headers, "Content-Length"), "%zu", &connection->bytes_to_transmit);
+        sscanf(dictionary_get(connection->response->headers, "Content-Length"), "%zu", &connection->body_bytes_to_transmit);
     }
 
     if ( connection->state == CS_WRITING_RESPONSE_BODY ) {
@@ -287,7 +287,7 @@ void server_handle_client(connection_t* connection, size_t event_data) {
             print_client_request_resolution(
                 connection->client_address, connection->client_port, http_method_str, 
                 connection->request->path, connection->request->protocol, connection->response->status, 
-                http_status_str, connection->bytes_to_transmit, &connection->time_received
+                http_status_str, connection->body_bytes_to_transmit, &connection->time_received
             );
 
 #if defined(__linux__)

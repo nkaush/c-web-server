@@ -1,6 +1,9 @@
 #include "request.h"
 #include "internals/format.h"
 
+#include <sys/syslimits.h>
+#include <fcntl.h>
+
 request_t* request_create(http_method method) {
     request_t* request = malloc(sizeof(request_t));
     request->method = method;
@@ -11,6 +14,16 @@ request_t* request_create(http_method method) {
     request->body = NULL;
 
     return request;
+}
+
+void request_destroy_body(request_body_t* body) {
+    if (body->type == RQBT_FILE) {
+        fclose(body->content.file);
+    } else {
+        free(body->content.str);
+    }
+
+    free(body);
 }
 
 void request_destroy(request_t* request) {
@@ -26,7 +39,7 @@ void request_destroy(request_t* request) {
         free(request->path);
 
     if ( request->body )
-        free(request->body);
+        request_destroy_body(request->body);
 
     free(request);
 }
@@ -55,4 +68,22 @@ void request_parse_query_params(request_t* request) {
         if ( token )
             dictionary_set(request->params, key, token);
     }
+}
+
+void request_init_str_body(request_t* request, size_t len) {
+    request_body_t* body = malloc(sizeof(request_body_t));
+    body->type = RQBT_STRING;
+    body->content.str = calloc(len, sizeof(char));
+    body->length = len;
+
+    request->body = body;
+}
+
+void request_init_tmp_file_body(request_t* request, size_t len) {
+    request_body_t* body = malloc(sizeof(request_body_t));
+    body->type = RQBT_FILE;
+    body->content.file = tmpfile();
+    body->length = len;
+
+    request->body = body;
 }

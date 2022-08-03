@@ -44,6 +44,9 @@ response_t* response_empty(http_status status);
 /// ERROR RESPONSE CONSTRUCTORS
 
 // Constructs a response for 400 Bad Response with a pre-populated json message
+response_t* response_malformed_request(void);
+
+// Constructs a response for 400 Bad Response with a pre-populated json message
 response_t* response_bad_request(void);
 
 // Constructs a response for 404 Not Found with a pre-populated json message
@@ -51,6 +54,9 @@ response_t* response_resource_not_found(void);
 
 // Constructs a response for 405 Method Not Allowed with a pre-populated json message
 response_t* response_method_not_allowed(void);
+
+// Constructs a response for 411 Length Required with a pre-populated json message
+response_t* response_length_required(void);
 
 // Constructs a response for 414 URI Too Long with a pre-populated json message
 response_t* response_uri_too_long(void);
