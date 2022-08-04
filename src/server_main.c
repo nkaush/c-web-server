@@ -1,12 +1,12 @@
 #include "server.h"
+
+#include <unistd.h>
 #include <err.h>
 
 #if defined(__APPLE__) && defined(DEBUG)
-static char* program_name;
-
 void check_leaks(void) {
     char cmd[100];
-    sprintf(cmd, "export MallocStackLogging=1 && leaks %s", program_name + 2);
+    sprintf(cmd, "leaks --list %d", getpid());
     printf("%s\n", cmd);
     system(cmd);
 }  
@@ -48,7 +48,6 @@ response_t* handout(request_t* request) {
 
 int main(int argc, char** argv) {
 #if defined(__APPLE__) && defined(DEBUG)
-    program_name = argv[0];
     atexit(check_leaks);
 #endif
 

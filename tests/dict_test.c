@@ -3,23 +3,19 @@
 #include <assert.h>
 #include <stdio.h>
 
-static char* program_name;
-
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(DEBUG)
 void check_leaks(void) {
     char cmd[100];
-    sprintf(cmd, "export MallocStackLogging=1 && leaks %s", program_name + 2);
+    sprintf(cmd, "leaks --list %d", getpid());
     printf("%s\n", cmd);
     system(cmd);
 }  
 #endif
 
 int main(int argc, char** argv) {
-    program_name = argv[0];
-
-    #ifdef __APPLE__
+#ifdef __APPLE__
     atexit(check_leaks);
-    #endif
+#endif
 
     dictionary* d = int_to_int_dictionary_create();
 

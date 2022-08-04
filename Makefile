@@ -128,3 +128,6 @@ trace: debug
 
 valgrind: server-debug
 	valgrind --leak-check=full --show-leak-kinds=all ./server-debug 8000
+
+leaks: server-debug
+	export MallocStackLogging=1 && ./server-debug 80
