@@ -61,14 +61,11 @@ ssize_t buffered_write_to_socket(int socket_fd, FILE* in, size_t count) {
 ssize_t write_all_to_socket(int socket_fd, const char *buffer, size_t count) {
     ssize_t return_code = 0;
     ssize_t bytes_sent = 0;
-
-    size_t original = count;
     
     while (count > 0) {
         return_code = write(socket_fd, buffer + bytes_sent, count);
 
         if (return_code == 0) {
-            LOG("Expected: %zu, Actual: %zd", original, bytes_sent);
             return bytes_sent;
         } else if (return_code > 0) {
             bytes_sent += return_code;
@@ -76,16 +73,13 @@ ssize_t write_all_to_socket(int socket_fd, const char *buffer, size_t count) {
         } else if (return_code == -1 && errno == EINTR) {
             continue;
         } else if (return_code == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            LOG("Expected: %zu, Actual: %zd", original, bytes_sent);
             LOG(BOLDRED"EAGAIN"RESET);
             return bytes_sent;
         } else {
-            LOG("Expected: %zu, Actual: %zd", original, bytes_sent);
             return -1;
         }
     }
 
-    LOG("Expected: %zu, Actual: %zd", original, bytes_sent);
     return bytes_sent;
 }
 
@@ -166,23 +160,29 @@ int num_bytes_in_rd_socket(int fd) {
 }
 
 int num_bytes_in_wr_socket(int fd) {
-    int count = 0;
+    int count;
 #if defined(__linux__)
     if ( ioctl(fd, TIOCOUTQ, &count) == -1) 
         perror("ioctl TIOCOUTQ");
 #elif defined(__APPLE__)
     unsigned int m = sizeof(count);
-    getsockopt(fd, SOL_SOCKET, SO_NWRITE, &count, &m);
+    if ( getsockopt(fd, SOL_SOCKET, SO_NWRITE, &count, &m) < 0 )
+        perror("getsockopt SO_NWRITE");
 #endif
+    return count;
+}
+
+int socket_snd_buf_size(int fd) {
+    int count;
+    unsigned int m = sizeof(count);
+
+    if ( getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void*) &count, &m) == -1 )
+        perror("getsockopt SO_SNDBUF");
+
     return count;
 }
 
 int free_bytes_in_wr_socket(int fd) {
     // adapted from https://stackoverflow.com/a/36771727
-    int queue_size = 0;
-    unsigned int m = sizeof(queue_size);
-    if ( getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void*) &queue_size, &m) == -1 )
-        perror("getsockopt SO_SNDBUF");
-
-    return queue_size - num_bytes_in_wr_socket(fd);
+    return socket_snd_buf_size(fd) - num_bytes_in_wr_socket(fd);
 }

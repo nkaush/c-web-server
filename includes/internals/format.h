@@ -44,6 +44,8 @@
 
 static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
 
+double timespec_difftime(struct timespec* start, struct timespec* finish);
+
 void format_time(char* buf, time_t time);
 
 // buf must be a buffer of at least 30 characters
@@ -53,8 +55,10 @@ void print_client_connected(char* addr, uint16_t port);
 
 void print_client_request_resolution(
     const char* addr, uint16_t port, const char* method, const char* route,
-    const char* protocol, int status, const char* status_str, size_t content_len, 
-    struct timespec* start);
+    const char* protocol, int status, const char* status_str, 
+    size_t request_content_len, size_t response_content_len, 
+    struct timespec* connected, struct timespec* connect_finish, 
+    struct timespec* send_begin);
 
 void print_server_details(char* port);
 

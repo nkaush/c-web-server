@@ -38,10 +38,11 @@ typedef struct _connection {
     int client_fd;
     int buf_end;
     int buf_ptr;
+    struct timespec time_connected;
     struct timespec time_received;
+    struct timespec time_begin_send;
     uint16_t client_port; 
-    uint8_t body_length_parsed;
-    // body_bytes_received
+    uint8_t flags;
 } connection_t;
 
 // Initialize a connection data structure and save to the global connections 
@@ -52,7 +53,7 @@ void* connection_init(void* ptr);
 void connection_destroy(void* ptr);
 
 // Read bytes from a file descriptor and save to the connection buffer. 
-ssize_t connection_read(connection_t* conn);
+ssize_t connection_read(connection_t* conn, size_t event_data);
 
 void connection_shift_buffer(connection_t* conn);
 

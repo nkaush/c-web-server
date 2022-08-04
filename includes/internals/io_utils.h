@@ -60,6 +60,7 @@ void make_socket_non_blocking(int fd);
 
 /**
  * @brief Check if a socket has bytes to read.
+ * Calls ioctl(fd, FIONREAD, ...) internally.
  * 
  * @param fd the socket to check
  * @return the number of bytes available.
@@ -68,11 +69,22 @@ int num_bytes_in_rd_socket(int fd);
 
 /**
  * @brief Get the number of unsent bytes in the socket.
+ * Internally calls ioctl(fd, TIOCOUTQ, ...) on Linux or 
+ * getsockopt(fd, SOL_SOCKET, SO_NWRITE, &count, &m) on Apple.
  * 
  * @param fd the socket to check
  * @return the number of bytes available.
  */
 int num_bytes_in_wr_socket(int fd);
+
+/**
+ * @brief Get the size of the internal socket send buffer. 
+ * Calls getsockopt(fd, SOL_SOCKET, SO_SNDBUF, ...) internally
+ * 
+ * @param fd the socket to check
+ * @return the internal socket buffer size.
+ */
+int socket_snd_buf_size(int fd);
 
 /**
  * @brief Get the number of bytes we can send to the socket.

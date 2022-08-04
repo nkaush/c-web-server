@@ -132,7 +132,9 @@ int server_handle_new_client(void) {
     
 #if defined(__APPLE__)
         struct kevent client_event;
-        EV_SET(&client_event, client_fd, EVFILT_READ, EV_ADD | EV_ENABLE | EV_EOF | EV_CLEAR, 0, 0, connection);
+        // uint16_t flags = EV_ADD | EV_CLEAR;
+        uint16_t flags = EV_ADD;
+        EV_SET(&client_event, client_fd, EVFILT_READ, flags, 0, 0, connection);
 
         if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
@@ -212,89 +214,74 @@ response_t* handle_response(request_t* request) {
 }
 
 // Handle an kqueue event from a client connection.
-void server_handle_client(connection_t* connection, size_t event_data) {
+void server_handle_client(connection_t* c, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
-    if ( connection->state < CS_REQUEST_RECEIVED ) {
-        if ( connection_read(connection) <= 0 ) { return; }
-        LOG("%s", connection->buf);
+    if ( c->state < CS_REQUEST_RECEIVED ) {
+        if ( connection_read(c, event_data) <= 0 ) { return; }
     }
 
-    if ( connection->state == CS_CLIENT_CONNECTED )
-        connection_try_parse_verb(connection);
+    if ( c->state == CS_CLIENT_CONNECTED )
+        connection_try_parse_verb(c);
     
-    if ( connection->state == CS_METHOD_PARSED )
-        connection_try_parse_url(connection);
+    if ( c->state == CS_METHOD_PARSED )
+        connection_try_parse_url(c);
 
-    if ( connection->state == CS_URL_PARSED ) {
-        connection_try_parse_protocol(connection);
+    if ( c->state == CS_URL_PARSED )
+        connection_try_parse_protocol(c);
 
-        LOG("[%s] [%s] [%s]", http_method_to_string(connection->request->method), 
-            connection->request->path, connection->request->protocol
-        );
+    if ( c->state == CS_REQUEST_PARSED ) {
+        connection_try_parse_headers(c);
+        connection_shift_buffer(c);
     }
 
-    if ( connection->state == CS_REQUEST_PARSED ) {
-        connection_try_parse_headers(connection);
-        connection_shift_buffer(connection);
-        LOG("[%s] [%d, %d]", connection->buf, connection->buf_ptr, connection->buf_end);
-    }
+    if ( c->state == CS_HEADERS_PARSED )
+        connection_read_request_body(c);
 
-    if ( connection->state == CS_HEADERS_PARSED )
-        connection_read_request_body(connection);
-
-    if ( connection->state == CS_REQUEST_RECEIVED ) {
-        connection->response = handle_response(connection->request);
-        connection->state = CS_WRITING_RESPONSE_HEADER;
+    if ( c->state == CS_REQUEST_RECEIVED ) {
+        c->response = handle_response(c->request);
+        c->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
         struct kevent change_rd_to_wr, new_wr_event;
-        uint16_t flags =  EV_ADD | EV_ENABLE | EV_CLEAR;
-        EV_SET(&change_rd_to_wr, connection->client_fd, EVFILT_WRITE, flags, 0, 0, connection);
+        uint16_t flags = EV_ADD | EV_CLEAR;
+        // uint16_t flags = EV_ADD;
+        EV_SET(&change_rd_to_wr, c->client_fd, EVFILT_WRITE, flags, 0, 0, c);
 
         if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
             err(EXIT_FAILURE, "kevent register");
 
-        LOG("%zu", new_wr_event.data);
         event_data = new_wr_event.data;
 #endif
-        /// @todo https://www.netmeister.org/blog/ipcbufs.html#:~:text=That%27s%20right%3A%20when,for%20normal%20users).
-        
-        LOG("before=%d (change to %zu * 3 = %zu)", free_bytes_in_wr_socket(connection->client_fd), event_data, event_data * 3);
-        connection_resize_sock_send_buf(connection, event_data * 2);
-
-        int new_snd_buf_size = free_bytes_in_wr_socket(connection->client_fd);
-        LOG("after=%d", new_snd_buf_size);
-
-        connection_resize_local_buffer(connection, new_snd_buf_size);
     }
 
-    if ( connection->state == CS_WRITING_RESPONSE_HEADER ) {         
+    if ( c->state == CS_WRITING_RESPONSE_HEADER ) {         
         char* header_str = NULL;
-        int header_len = format_response_header(connection->response, &header_str);
+        int header_len = format_response_header(c->response, &header_str);
         
-        write_all_to_socket(connection->client_fd, header_str, header_len);
+        write_all_to_socket(c->client_fd, header_str, header_len);
 
         free(header_str);
-        connection->state = CS_WRITING_RESPONSE_BODY;
-        sscanf(dictionary_get(connection->response->headers, "Content-Length"), "%zu", &connection->body_bytes_to_transmit);
+        c->state = CS_WRITING_RESPONSE_BODY;
     }
 
-    if ( connection->state == CS_WRITING_RESPONSE_BODY ) {
-        if ( !connection_try_send_response_body(connection, event_data) ) {
-            const char* http_method_str = http_method_to_string(connection->request->method);
-            const char* http_status_str = http_status_to_string(connection->response->status);
+    if ( c->state == CS_WRITING_RESPONSE_BODY ) {
+        if ( !connection_try_send_response_body(c, event_data) ) {
+            const char* http_method_str = http_method_to_string(c->request->method);
+            const char* http_status_str = http_status_to_string(c->response->status);
 
             print_client_request_resolution(
-                connection->client_address, connection->client_port, http_method_str, 
-                connection->request->path, connection->request->protocol, connection->response->status, 
-                http_status_str, connection->body_bytes_to_transmit, &connection->time_received
+                c->client_address, c->client_port, http_method_str, 
+                c->request->path, c->request->protocol, c->response->status, 
+                http_status_str, c->body_bytes_to_receive, 
+                c->body_bytes_to_transmit, &c->time_connected,
+                &c->time_received, &c->time_begin_send
             );
 
 #if defined(__linux__)
             if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, connection->client_fd, NULL) < 0)
                 err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif
-            connection_destroy(connection);
+            connection_destroy(c);
         }
     }
 }
@@ -379,7 +366,14 @@ void server_launch(void) {
                 connection_t* connection = events_array[i].data.ptr;
                 size_t event_data = free_bytes_in_wr_socket(connection->client_fd);
 #endif
-                LOG("kqueue: %ld", event_data);
+                if ( events_array[i].flags & EV_EOF ) {
+                    WARN("client on fd=%d disconnected", connection->client_fd);
+                    continue;
+                }
+
+                char time_buf[30];
+                format_current_time(time_buf);
+                // printf("[%s] kqueue: %zu\n", time_buf, event_data);
                 server_handle_client(connection, event_data);
             }
         }
