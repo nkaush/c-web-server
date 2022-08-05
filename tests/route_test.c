@@ -6,8 +6,11 @@ response_t* get(request_t* request) { return NULL; }
 
 response_t* post(request_t* request) { return NULL; }
 
+response_t* favicon(request_t* request) { return NULL; }
+
 int main(int argc, char** argv) {
-    register_route(HTTP_GET, "/", root);
+    // register_route(HTTP_GET, "/", root);
+    register_route(HTTP_GET, "/favicon.ico", favicon);
     register_route(HTTP_GET, "/v1/api/test", get);
     register_route(HTTP_POST, "/v1/api/test", post);
 
@@ -21,7 +24,7 @@ int main(int argc, char** argv) {
     printf("expected: %p vs actual %p\n", post, h);
 
     h = get_handler(HTTP_GET, "/");
-    printf("expected: %p vs actual %p\n", root, h);
+    printf("expected: %p vs actual %p\n", NULL, h);
 
     h = get_handler(HTTP_DELETE, "/v1/api/test");
     printf("expected: %p vs actual %p\n", NULL, h);
