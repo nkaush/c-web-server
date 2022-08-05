@@ -34,9 +34,10 @@ TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
 OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_INTERNAL) $(OBJS_LIBS)
-OBJS_SERVER = server.o request.o response.o protocol.o
-OBJS_SERVER += $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) 
-OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_LIBS) 
+OBJS_HTTP   = server.o request.o response.o protocol.o route.o
+OBJS_TEST   = $(OBJS_HTTP) $(OBJS_LIBS)
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) $(OBJS_HTTP) 
+OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_LIBS) route.o request.o response.o protocol.o format.o
 
 .PHONY: all
 all: release
@@ -62,7 +63,10 @@ test: 	 $(TEST_EXES)
 # include dependencies
 -include $(OBJS_DIR)/*.d
 
-# Patterns to create objects: keep the debug and release postfix for object files so that we can always separate them correctly
+################################################################################
+#                          Patterns to Create Objects                          #
+# keep debug & release postfix for object files so we can always separate them #
+################################################################################
 $(OBJS_DIR)/%-debug.o: $(SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
 
@@ -87,7 +91,9 @@ $(OBJS_DIR)/%-release.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
 $(OBJS_DIR)/%-debug.o: $(TEST_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
 
-# exes
+################################################################################
+#                          Rules to Link Executables                           #
+################################################################################
 $(EXE_SERVER): $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-release.o)
 	$(LD) $^ -o $@
 
@@ -104,9 +110,12 @@ $(EXE_MAIN): $(OBJS_MAIN:%.o=$(OBJS_DIR)/%-debug.o)
 	$(LD) $^ -o $@
 
 # Rules to link test executables
-$(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_LIBS:%.o=$(OBJS_DIR)/%-debug.o)
+$(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_TEST:%.o=$(OBJS_DIR)/%-debug.o)
 	$(LD) $^ -o $(notdir $@)
 
+################################################################################
+#                              Bash Command Rules                              #
+################################################################################
 .PHONY: clean
 clean:
 	rm -rf .objs $(TEST_EXES) $(EXE_CLIENT) $(EXE_SERVER) $(EXE_CLIENT)-debug $(EXE_SERVER)-debug $(EXE_MAIN)

@@ -87,17 +87,18 @@ bool dictionary_should_resize(dictionary* this) {
     return (a / b) >= ALPHA;
 }
 
-dictionary* dictionary_create(hash_function_type hash_function, compare comp,
-                              copy_constructor_type key_copy_constructor,
-                              destructor_type key_destructor,
-                              copy_constructor_type value_copy_constructor,
-                              destructor_type value_destructor) {
+dictionary* dictionary_create_with_capacity(
+        size_t capacity, hash_function_type hash_function, compare comp,
+        copy_constructor_type key_copy_constructor, 
+        destructor_type key_destructor,
+        copy_constructor_type value_copy_constructor, 
+        destructor_type value_destructor) {
     dictionary* this = malloc(sizeof(dictionary));
 
     this->size = 0;
     this->head = NULL;
     this->tail = NULL;
-    this->capacity = find_next_prime(0);
+    this->capacity = capacity;
     this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(dict_node_t*));
 
@@ -110,7 +111,18 @@ dictionary* dictionary_create(hash_function_type hash_function, compare comp,
     this->hash_function = hash_function;
     this->comp = comp;
 
-    return this;   
+    return this;
+}
+
+dictionary* dictionary_create(hash_function_type hash_function, compare comp,
+                              copy_constructor_type key_copy_constructor,
+                              destructor_type key_destructor,
+                              copy_constructor_type value_copy_constructor,
+                              destructor_type value_destructor) {
+    return dictionary_create_with_capacity(
+        find_next_prime(0), hash_function, comp, key_copy_constructor,
+        key_destructor, value_copy_constructor, value_destructor
+    );
 }
 
 void dictionary_destroy(dictionary* this) {

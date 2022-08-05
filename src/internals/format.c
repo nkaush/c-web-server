@@ -51,6 +51,7 @@ void print_client_request_resolution(
     double receive_duration = timespec_difftime(connected, connect_finish);
     double process_duration = timespec_difftime(connect_finish, send_begin);
     double send_duration = timespec_difftime(send_begin, &now);
+    double total_duration = timespec_difftime(connected, &now);
 
     double receive_speed = compute_speed(receive_duration, request_content_len);
     double send_speed = compute_speed(send_duration, response_content_len);
@@ -67,11 +68,13 @@ void print_client_request_resolution(
 
     printf(
         "INFO [%s] [access] %s:%d \"%s %s %s\" -- %s%d %s "RESET
-        "[%zu bytes in / %zu bytes out] [%fs in / %fs handle / %fs out] "
+        "[%zu bytes in / %zu bytes out] "
+        "[%fs in / %fs handle / %fs out / %fs total] "
         "[%f Mbps in / %f Mbps out]\n", 
         time_buf, addr, port, method, route, protocol, color, status, status_str, 
-        request_content_len, response_content_len, receive_duration, 
-        process_duration, send_duration, receive_speed, send_speed
+        request_content_len, response_content_len, 
+        receive_duration, process_duration, send_duration, total_duration, 
+        receive_speed, send_speed
     );
 }
 

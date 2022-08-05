@@ -26,7 +26,7 @@
 
 #define DEFAULT_SND_BUFFER_SIZE (1UL << 16UL)
 #define MAX_SND_BUFFER_SIZE (1UL << 18UL)
-#define MIN_SND_CLKS 8
+#define MIN_SND_CLKS 15
 
 #define MAX_BUFFER_SIZE MAX_RCV_BUFFER_SIZE
 
@@ -255,7 +255,6 @@ void connection_read_request_body(connection_t* conn) {
             return;
         }
 
-        conn->body_bytes_received = conn->buf_end;
         sscanf(
             dictionary_get(request->headers, CONTENT_LENGTH_HEADER_KEY),
             "%zu", &conn->body_bytes_to_receive
@@ -263,24 +262,14 @@ void connection_read_request_body(connection_t* conn) {
 
         if ( conn->body_bytes_to_receive > MAX_RCV_BUFFER_SIZE ) {
             request_init_tmp_file_body(request, conn->body_bytes_to_receive);
-            fwrite(conn->buf, conn->buf_end, 1, request->body->content.file);
-            allocate_buffer_for_request(conn);   
+            allocate_buffer_for_request(conn);
         } else {
             request_init_str_body(request, conn->body_bytes_to_receive);
-            memcpy(request->body->content.str, conn->buf, conn->buf_end);
         }
-
-        conn->buf_end = 0;
-        conn->buf_ptr = 0;
-    } else if ( is_put_or_post ) {
-        if ( request->body->type == RQBT_FILE ) {
-            fwrite(conn->buf, conn->buf_end, 1, request->body->content.file);
-        } else if ( request->body->type == RQBT_STRING ) {
-            char* body_buf_end = 
-                request->body->content.str + conn->body_bytes_received;
-            memcpy(body_buf_end, conn->buf, conn->buf_end);
-        }
-
+    }
+    
+    if ( is_put_or_post ) {
+        request_read_body(conn->request, conn->buf, conn->buf_end);
         conn->body_bytes_received += conn->buf_end;
         conn->buf_end = 0;
         conn->buf_ptr = 0;
@@ -291,6 +280,53 @@ void connection_read_request_body(connection_t* conn) {
         conn->state = CS_REQUEST_RECEIVED;
         clock_gettime(CLOCK_REALTIME, &conn->time_received);
     }
+}
+
+int format_response_header(response_t* response, char** buffer) {
+    static const char* HEADER_FMT = "%s: %s\r\n";
+    static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
+
+    vector* defined_header_keys = dictionary_keys(response->headers);
+    vector* formatted_headers = string_vector_create();
+    int allocated_space = 1; // allow for NUL-byte at the end
+
+    for (size_t i = 0; i < vector_size(defined_header_keys); ++i) {
+        char* key = vector_get(defined_header_keys, i);
+        char* value = dictionary_get(response->headers, key);
+        char* buffer = NULL;
+        allocated_space += asprintf(&buffer, HEADER_FMT, key, value);
+
+        vector_push_back(formatted_headers, buffer);
+        free(buffer);
+    }
+
+    char* joined_headers = calloc(1, allocated_space);
+    for (size_t i = 0; i < vector_size(formatted_headers); ++i)
+        strcat(joined_headers, vector_get(formatted_headers, i));
+    
+    strcat(joined_headers, "\0");
+
+    const char* status_str = http_status_to_string(response->status);
+    int ret = asprintf(
+        buffer, RESPONSE_HEADER_FMT, 
+        response->status, status_str, joined_headers
+    );
+    
+    vector_destroy(defined_header_keys);
+    vector_destroy(formatted_headers);
+    free(joined_headers);
+
+    return ret;
+}
+
+void connection_write_response_header(connection_t* connection) {
+    char* header_str = NULL;
+    int header_len = format_response_header(connection->response, &header_str);
+    
+    write_all_to_socket(connection->client_fd, header_str, header_len);
+    free(header_str);
+    
+    connection->state = CS_WRITING_RESPONSE_BODY;
 }
 
 void allocate_buffer_for_response(connection_t* conn) {
@@ -328,7 +364,9 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
     if ( response->rt == RT_FILE ) {
         fread(conn->buf, sizeof(char), to_send, response->body_content.file);
     } else if ( response->rt == RT_STRING ) {
-        memcpy(conn->buf, conn->response->body_content.body, to_send);
+        const char* snd_buf = 
+            response->body_content.body + conn->body_bytes_transmitted;
+        memcpy(conn->buf, snd_buf, to_send);
     }
     
     ssize_t return_code = 

@@ -2,9 +2,19 @@
 #include <stdlib.h>
 #include <time.h>
 
+#if defined(__APPLE__) && defined(DEBUG)
+void check_leaks(void) {
+    char cmd[100];
+    sprintf(cmd, "leaks --list %d", getpid());
+    printf("%s\n", cmd);
+    system(cmd);
+}  
+#endif
+
 int main(int argc, char** argv) {
-    // assert(argc > 1);
-    // size_t size = atoi(argv[1]);
+#if defined(__APPLE__) && defined(DEBUG)
+    atexit(check_leaks);
+#endif
     size_t size = 20;
     bitfield* bf = bitfield_create(size);
 

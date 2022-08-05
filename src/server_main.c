@@ -1,4 +1,5 @@
 #include "server.h"
+#include "internals/format.h"
 
 #include <unistd.h>
 #include <err.h>
@@ -23,6 +24,7 @@ response_t* dummy(request_t* request) {
     response_t* r = NULL;
     if ( request->body->type == RQBT_STRING ) {
         r = response_from_string(STATUS_OK, request->body->content.str);
+        LOG("%s", request->body->content.str);
     } else {
         r = response_from_string(STATUS_OK, "{\"response\":\"Data is too long to format\"}");
     }
@@ -35,6 +37,13 @@ response_t* dummy(request_t* request) {
 response_t* favicon(request_t* request) {
     response_t* r = response_from_file(STATUS_OK, fopen("./favicon.png", "r"));
     response_set_content_type(r, CONTENT_TYPE_PNG);
+
+    time_t expires = time(NULL) + 691200;
+    char buf[TIME_BUFFER_SIZE] = { 0 };
+    format_time(buf, expires);
+
+    response_set_header(r, "Expires", buf);
+    response_set_header(r, "Cache-Control", "public, max-age=691200");
 
     return r;
 }

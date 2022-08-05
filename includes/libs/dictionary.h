@@ -47,13 +47,17 @@ typedef struct dictionary dictionary;
  * If you supply NULL for the compare then elements will be compared by their
  * virtual address (pointer value).
  */
-dictionary *dictionary_create(hash_function_type hash_function, compare comp,
+dictionary *dictionary_create(
+    hash_function_type hash_function, compare comp,
+    copy_constructor_type key_copy_constructor, destructor_type key_destructor,
+    copy_constructor_type value_copy_constructor, destructor_type value_destructor
+);
 
-                              copy_constructor_type key_copy_constructor,
-                              destructor_type key_destructor,
-
-                              copy_constructor_type value_copy_constructor,
-                              destructor_type value_destructor);
+dictionary* dictionary_create_with_capacity(
+    size_t capacity, hash_function_type hash_function, compare comp,
+    copy_constructor_type key_copy_constructor, destructor_type key_destructor,
+    copy_constructor_type value_copy_constructor, destructor_type value_destructor
+);
 
 /**
  * Destroys all container elements by calling on the user provided destructor

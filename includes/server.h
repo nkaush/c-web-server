@@ -1,13 +1,10 @@
 #pragma once
 #include "internals/connection.h"
 #include "internals/io_utils.h"
+#include "protocol.h"
 #include "response.h"
 #include "request.h"
-
-// This handler function type will receive a request_t struct and must return 
-// the response body that must be send to the client in response to the route 
-// this handler serves.
-typedef response_t* (*request_handler_t)(request_t*);
+#include "route.h"
 
 // Initialize the server and bind to the specified port.
 void server_init(char* port);

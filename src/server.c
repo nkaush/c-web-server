@@ -3,7 +3,6 @@
 #include "internals/format.h"
 #include "libs/dictionary.h"
 #include "libs/callbacks.h"
-#include "protocol.h"
 #include "server.h"
 
 #include <sys/socket.h>
@@ -31,8 +30,6 @@ static int event_queue_fd = 0;
 static int stop_server = 0;
 static int server_socket = 0;
 static int was_server_initialized = 0;
-
-static dictionary* routes = NULL;
 
 // Configure the server socket.
 void server_setup_socket(char* port) {
@@ -71,12 +68,7 @@ void server_setup_socket(char* port) {
 void handle_sigint(int signal) { (void)signal; stop_server = 1; }
 
 // Gracefully capture SIGPIPE and do nothing.
-void handle_sigpipe(int signal) { (void)signal; }
-
-void* allocate_handler_array(void* ptr) {
-    (void)ptr;
-    return calloc(NUM_HTTP_METHODS, sizeof(request_handler_t));
-}
+void handle_sigpipe(int signal) { (void)signal; WARN("SIGPIPE"); }
 
 // Configure the server's resources.
 void server_setup_resources(void) {
@@ -85,12 +77,6 @@ void server_setup_resources(void) {
 #elif defined(__linux__)
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct epoll_event));
 #endif
-    routes = dictionary_create(
-        string_hash_function, string_compare,
-        string_copy_constructor, string_destructor, 
-        allocate_handler_array, free
-    );
-
     struct sigaction sigint_action, sigpipe_action;
     memset(&sigint_action, 0, sizeof(sigint_action));
     memset(&sigpipe_action, 0, sizeof(sigpipe_action));
@@ -121,7 +107,8 @@ int server_handle_new_client(void) {
         return -1;
     } else {
         if (client_fd >= MAX_FILE_DESCRIPTORS) 
-            errx(EXIT_FAILURE, "client_fd (%d) >= MAX_FILE_DESCRIPTORS (%d)", client_fd, MAX_FILE_DESCRIPTORS);
+            errx(EXIT_FAILURE, "client_fd (%d) >= MAX_FILE_DESCRIPTORS (%d)", 
+                client_fd, MAX_FILE_DESCRIPTORS);
 
         make_socket_non_blocking(client_fd);
         connection_initializer_t c_init = { 0 };
@@ -132,8 +119,7 @@ int server_handle_new_client(void) {
     
 #if defined(__APPLE__)
         struct kevent client_event;
-        // uint16_t flags = EV_ADD | EV_CLEAR;
-        uint16_t flags = EV_ADD;
+        uint16_t flags = EV_ADD; // add EV_CLEAR?
         EV_SET(&client_event, client_fd, EVFILT_READ, flags, 0, 0, connection);
 
         if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
@@ -156,40 +142,6 @@ int server_handle_new_client(void) {
     }
 }
 
-int format_response_header(response_t* response, char** buffer) {
-    static const char* HEADER_FMT = "%s: %s\r\n";
-    static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
-
-    vector* defined_header_keys = dictionary_keys(response->headers);
-    vector* formatted_headers = string_vector_create();
-    int allocated_space = 1; // allow for NUL-byte at the end
-
-    for (size_t i = 0; i < vector_size(defined_header_keys); ++i) {
-        char* key = vector_get(defined_header_keys, i);
-        char* value = dictionary_get(response->headers, key);
-        char* buffer = NULL;
-        allocated_space += asprintf(&buffer, HEADER_FMT, key, value);
-
-        vector_push_back(formatted_headers, buffer);
-        free(buffer);
-    }
-
-    char* joined_headers = calloc(1, allocated_space);
-    for (size_t i = 0; i < vector_size(formatted_headers); ++i)
-        strcat(joined_headers, vector_get(formatted_headers, i));
-    
-    strcat(joined_headers, "\0");
-
-    const char* status_str = http_status_to_string(response->status);
-    int ret = asprintf(buffer, RESPONSE_HEADER_FMT, response->status, status_str, joined_headers);
-    
-    vector_destroy(defined_header_keys);
-    vector_destroy(formatted_headers);
-    free(joined_headers);
-
-    return ret;
-}
-
 response_t* handle_response(request_t* request) {
     /// @todo make default response handling configurable
     char* requested_route = request->path;
@@ -200,9 +152,7 @@ response_t* handle_response(request_t* request) {
     } else if ( !dictionary_contains(routes, requested_route) ) {
         response = response_resource_not_found();
     } else {
-        request_handler_t* handlers = dictionary_get(routes, requested_route);
-        request_handler_t handler = handlers[request->method];
-
+        request_handler_t handler = get_handler(request->method, request->path);
         if ( !handler ) {
             response = response_method_not_allowed();
         } else {
@@ -243,8 +193,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
 
 #if defined(__APPLE__)
         struct kevent change_rd_to_wr, new_wr_event;
-        uint16_t flags = EV_ADD | EV_CLEAR;
-        // uint16_t flags = EV_ADD;
+        uint16_t flags = EV_ADD; // add EV_CLEAR?
         EV_SET(&change_rd_to_wr, c->client_fd, EVFILT_WRITE, flags, 0, 0, c);
 
         if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
@@ -254,15 +203,8 @@ void server_handle_client(connection_t* c, size_t event_data) {
 #endif
     }
 
-    if ( c->state == CS_WRITING_RESPONSE_HEADER ) {         
-        char* header_str = NULL;
-        int header_len = format_response_header(c->response, &header_str);
-        
-        write_all_to_socket(c->client_fd, header_str, header_len);
-
-        free(header_str);
-        c->state = CS_WRITING_RESPONSE_BODY;
-    }
+    if ( c->state == CS_WRITING_RESPONSE_HEADER )
+        connection_write_response_header(c);
 
     if ( c->state == CS_WRITING_RESPONSE_BODY ) {
         if ( !connection_try_send_response_body(c, event_data) ) {
@@ -289,9 +231,6 @@ void server_handle_client(connection_t* c, size_t event_data) {
 // Cleanup the resources used by the server. Called on program exit.
 void server_cleanup(void) {
     LOG("Exiting server...");
-    if ( routes )
-        dictionary_destroy(routes);
-
     if ( events_array ) 
         free(events_array);
     
@@ -368,11 +307,10 @@ void server_launch(void) {
 #endif
                 if ( events_array[i].flags & EV_EOF ) {
                     WARN("client on fd=%d disconnected", connection->client_fd);
+                    close(fd);
                     continue;
                 }
 
-                char time_buf[30];
-                format_current_time(time_buf);
                 // printf("[%s] kqueue: %zu\n", time_buf, event_data);
                 server_handle_client(connection, event_data);
             }
@@ -381,19 +319,5 @@ void server_launch(void) {
 }
 
 void server_register_route(http_method method, char* route, request_handler_t handler) {
-    if ( method == HTTP_UNKNOWN )
-        errx(EXIT_FAILURE, "Cannot register handler for HTTP_UNKNOWN");
-    else if ( !route ) 
-        errx(EXIT_FAILURE, "Cannot register handler for NULL route");
-    else if ( !handler )
-        errx(EXIT_FAILURE, "Cannot register handler for NULL handler");
-
-    if ( !dictionary_contains(routes, route) )
-        dictionary_set(routes, route, NULL);
-
-    request_handler_t* method_array = dictionary_get(routes, route);
-    if ( method_array[(size_t) method] )
-        WARN("Redefinition of route '%s %s'", http_method_to_string(method), route);
-
-    method_array[(size_t) method] = handler;
+    register_route(method, route, handler);
 }

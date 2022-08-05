@@ -297,7 +297,19 @@ int test_vector_insert(void) {
     return did_pass;
 }
 
-int main(int argc, char *argv[]) {
+#if defined(__APPLE__) && defined(DEBUG)
+void check_leaks(void) {
+    char cmd[100];
+    sprintf(cmd, "leaks --list %d", getpid());
+    printf("%s\n", cmd);
+    system(cmd);
+}  
+#endif
+
+int main(int argc, char** argv) {
+#if defined(__APPLE__) && defined(DEBUG)
+    atexit(check_leaks);
+#endif
     #define NUM_TESTS 15
 
     char* test_names[NUM_TESTS] = {

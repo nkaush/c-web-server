@@ -1,5 +1,6 @@
 #include "libs/dictionary.h"
 
+#include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -13,7 +14,7 @@ void check_leaks(void) {
 #endif
 
 int main(int argc, char** argv) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(DEBUG)
     atexit(check_leaks);
 #endif
 

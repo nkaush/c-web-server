@@ -80,4 +80,6 @@ void connection_try_parse_headers(connection_t* conn);
 
 void connection_read_request_body(connection_t* conn);
 
+void connection_write_response_header(connection_t* connection);
+
 int connection_try_send_response_body(connection_t* conn, size_t max_receivable);
