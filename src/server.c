@@ -158,34 +158,12 @@ int server_handle_new_client(void) {
     }
 }
 
-response_t* handle_response(request_t* request) {
-    /// @todo make default response handling configurable
-    response_t* response = NULL;
-
-    if ( request->method == HTTP_UNKNOWN ) {
-        response = response_malformed_request();
-    } 
-    /// @todo differentiate between method not allowed and not found
-    // else if ( !dictionary_contains(routes, requested_route) ) {
-    //     response = response_resource_not_found();
-    // } 
-    else {
-        request_handler_t handler = get_handler(request->method, request->path);
-        if ( !handler ) {
-            response = response_method_not_allowed();
-        } else {
-            response = handler(request);
-        }
-    }
-
-    return response;
-}
-
 // Handle an kqueue event from a client connection.
 void server_handle_client(connection_t* c, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
     if ( c->state < CS_REQUEST_RECEIVED ) {
         if ( connection_read(c, event_data) <= 0 ) { return; }
+        LOG("%s", c->buf);
     }
 
     if ( c->state == CS_CLIENT_CONNECTED )
@@ -206,10 +184,11 @@ void server_handle_client(connection_t* c, size_t event_data) {
         connection_read_request_body(c);
 
     if ( c->state == CS_REQUEST_RECEIVED ) {
-        c->response = handle_response(c->request);
+        c->response = handle_route(c->request);
         c->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
+        /// @todo only add this event if we need to continue writing to the fd after this function finishes
         queue_event_change(EVFILT_WRITE, c->client_fd, c);
         // struct kevent change_rd_to_wr, new_wr_event;
         // uint16_t flags = EV_ADD; // add EV_CLEAR?

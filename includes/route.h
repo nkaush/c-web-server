@@ -8,6 +8,8 @@
 // this handler serves.
 typedef response_t* (*request_handler_t)(request_t*);
 
+typedef response_t* (*response_error_constructor_t)(void);
+
 typedef enum _url_component_type {
     UCT_CONSTANT,
     UCT_ROUTE_PARAM,
@@ -27,4 +29,4 @@ void node_destroy(node_t* node);
 
 void register_route(http_method method, const char* route, request_handler_t handler);
 
-request_handler_t get_handler(http_method method, const char* route);
+response_t* handle_route(request_t* request);

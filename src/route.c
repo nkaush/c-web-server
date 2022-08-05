@@ -8,6 +8,10 @@
 static node_t* root = NULL;
 static const char* URL_SEP = "/";
 
+static response_error_constructor_t RH_METHOD_NOT_ALLOWED = response_method_not_allowed;
+static response_error_constructor_t RH_MALFORMED_REQUEST = response_malformed_request;
+static response_error_constructor_t RH_NOT_FOUND = response_resource_not_found;
+
 void* __node_init(void* ptr) {
     return node_init(ptr);
 }
@@ -18,6 +22,7 @@ void __node_destroy(void* ptr) {
 
 node_t* node_init(char* component) {
     node_t* node = malloc(sizeof(node_t));
+    node->handlers = NULL;
     node->const_children = dictionary_create_with_capacity(
         DEFAULT_DICT_CAPACITY, string_hash_function, string_compare,
         string_copy_constructor, string_destructor, __node_init, __node_destroy
@@ -92,8 +97,11 @@ void register_route(http_method method, const char* route, request_handler_t han
     free(route_dup);
 }
 
-request_handler_t get_handler(http_method method, const char* route) {
-    char* route_dup = strdup(route + 1);
+response_t* handle_route(request_t* request) {
+    if ( request->method == HTTP_UNKNOWN )
+        return RH_MALFORMED_REQUEST();
+
+    char* route_dup = strdup(request->path + 1);
     char* route_str = route_dup;
     char* token = NULL;
     node_t* curr = root;
@@ -111,8 +119,14 @@ request_handler_t get_handler(http_method method, const char* route) {
     }
 
     free(route_dup);
-    if ( curr->handlers )
-        return curr->handlers[(size_t) method];
+    if ( curr->handlers ) { // the route exists...
+        request_handler_t handler = curr->handlers[request->method];
 
-    return NULL;
+        if ( !handler ) // however, the route is not defined for the requested method
+            return RH_METHOD_NOT_ALLOWED();
+
+        return handler(request);
+    } else { // the route does not exist...
+        return RH_NOT_FOUND();
+    }
 }
