@@ -1,7 +1,8 @@
 OBJS_DIR     = .objs
 TEST_DIR     = tests
 SRC_DIR      = src
-LIBS_SRC_DIR = $(SRC_DIR)/libs
+APPS_DIR     = apps
+LIBS_DIR = $(SRC_DIR)/libs
 INTERNALS_SRC_DIR = $(SRC_DIR)/internals
 
 EXE_SERVER = server
@@ -23,8 +24,8 @@ CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 # LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 
 # Find object files for libraries
-LIBS_SRC_FILES:=$(wildcard $(LIBS_SRC_DIR)/*.c)
-OBJS_LIBS:=$(patsubst $(LIBS_SRC_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
+LIBS_SRC_FILES:=$(wildcard $(LIBS_DIR)/*.c)
+OBJS_LIBS:=$(patsubst $(LIBS_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
 
 # Find object files for internals
 INTERNALS_SRC_FILES:=$(wildcard $(INTERNALS_SRC_DIR)/*.c)
@@ -74,10 +75,10 @@ $(OBJS_DIR)/%-release.o: $(SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
 # Define rules to compile object files for libraries
-$(OBJS_DIR)/%-debug.o: $(LIBS_SRC_DIR)/%.c | $(OBJS_DIR)
+$(OBJS_DIR)/%-debug.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
 
-$(OBJS_DIR)/%-release.o: $(LIBS_SRC_DIR)/%.c | $(OBJS_DIR)
+$(OBJS_DIR)/%-release.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
 # Define rules to compile object files for internals
@@ -85,6 +86,13 @@ $(OBJS_DIR)/%-debug.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
 
 $(OBJS_DIR)/%-release.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
+	$(CC) $(CFLAGS_RELEASE) $< -o $@
+
+# Define rules to compile object files for apps
+$(OBJS_DIR)/%-debug.o: $(APPS_DIR)/%.c | $(OBJS_DIR)
+	$(CC) $(CFLAGS_DEBUG) $< -o $@
+
+$(OBJS_DIR)/%-release.o: $(APPS_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
 # Define rules to compile object files for tests

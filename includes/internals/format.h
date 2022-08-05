@@ -51,7 +51,7 @@ void format_time(char* buf, time_t time);
 // buf must be a buffer of at least 30 characters
 void format_current_time(char* buf);
 
-void print_client_connected(char* addr, uint16_t port);
+void print_client_connected(char* addr, uint16_t port, int client_fd);
 
 void print_client_request_resolution(
     const char* addr, uint16_t port, const char* method, const char* route,

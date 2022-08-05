@@ -74,6 +74,7 @@ void connection_destroy(void* ptr) {
     if ( this->client_address )
         free(this->client_address);
 
+    WARN("destroy connection on fd=%d", this->client_fd);
     close(this->client_fd);
     free(this);
 }

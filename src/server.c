@@ -136,7 +136,7 @@ int server_handle_new_client(void) {
         if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
             err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_ADD");
 #endif
-        print_client_connected(c_init.client_address, c_init.client_port);
+        print_client_connected(c_init.client_address, c_init.client_port, client_fd);
 
         return client_fd;
     }
@@ -144,14 +144,16 @@ int server_handle_new_client(void) {
 
 response_t* handle_response(request_t* request) {
     /// @todo make default response handling configurable
-    char* requested_route = request->path;
     response_t* response = NULL;
 
     if ( request->method == HTTP_UNKNOWN ) {
         response = response_malformed_request();
-    } else if ( !dictionary_contains(routes, requested_route) ) {
-        response = response_resource_not_found();
-    } else {
+    } 
+    /// @todo differentiate between method not allowed and not found
+    // else if ( !dictionary_contains(routes, requested_route) ) {
+    //     response = response_resource_not_found();
+    // } 
+    else {
         request_handler_t handler = get_handler(request->method, request->path);
         if ( !handler ) {
             response = response_method_not_allowed();
@@ -168,6 +170,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
     if ( c->state < CS_REQUEST_RECEIVED ) {
         if ( connection_read(c, event_data) <= 0 ) { return; }
+        LOG("[%s]", c->buf);
     }
 
     if ( c->state == CS_CLIENT_CONNECTED )
@@ -220,7 +223,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
             );
 
 #if defined(__linux__)
-            if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, connection->client_fd, NULL) < 0)
+            if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, c->client_fd, NULL) < 0)
                 err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif
             connection_destroy(c);
@@ -301,17 +304,24 @@ void server_launch(void) {
 #if defined(__APPLE__)
                 connection_t* connection = events_array[i].udata;
                 size_t event_data = events_array[i].data;
-#elif defined(__linux__)
-                connection_t* connection = events_array[i].data.ptr;
-                size_t event_data = free_bytes_in_wr_socket(connection->client_fd);
-#endif
+
                 if ( events_array[i].flags & EV_EOF ) {
                     WARN("client on fd=%d disconnected", connection->client_fd);
                     close(fd);
                     continue;
                 }
+#elif defined(__linux__)
+                connection_t* connection = events_array[i].data.ptr;
+                size_t event_data = num_bytes_in_rd_socket(connection->client_fd);
 
-                // printf("[%s] kqueue: %zu\n", time_buf, event_data);
+                if ( events_array[i].events & (EPOLLRDHUP | EPOLLHUP) ) {
+                    WARN("client on fd=%d disconnected", connection->client_fd);
+                    close(fd);
+                    if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, connection->client_fd, NULL) < 0)
+                        err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
+                    continue;
+                }
+#endif
                 server_handle_client(connection, event_data);
             }
         }

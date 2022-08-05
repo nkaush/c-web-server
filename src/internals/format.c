@@ -21,10 +21,10 @@ void format_current_time(char* buf) {
     format_time(buf, time(NULL));
 }
 
-void print_client_connected(char* addr, uint16_t port) {
+void print_client_connected(char* addr, uint16_t port, int client_fd) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
-    printf("INFO [%s] [access] %s:%d connected...\n", time_buf, addr, port);
+    printf("INFO [%s] [access] %s:%d connected on fd=%d...\n", time_buf, addr, port, client_fd);
 }
 
 double timespec_difftime(timespec* start, timespec* finish) {
