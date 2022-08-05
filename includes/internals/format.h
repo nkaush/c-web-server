@@ -26,6 +26,7 @@
 
 #define TIME_BUFFER_SIZE 30
 
+#ifdef DEBUG
 #define LOG(...)                                         \
     do {                                                 \
         fprintf(stderr, "DEBUG ");                       \
@@ -33,7 +34,11 @@
         fprintf(stderr, __VA_ARGS__);                    \
         fprintf(stderr, "\n");                           \
     } while (0);
+#else
+#define LOG(...)
+#endif
 
+#ifdef DEBUG
 #define WARN(...)                                        \
     do {                                                 \
         fprintf(stderr, BOLDRED"WARN ");                 \
@@ -41,6 +46,9 @@
         fprintf(stderr, __VA_ARGS__);                    \
         fprintf(stderr, "\n"RESET);                      \
     } while (0);
+#else
+#define WARN(...)
+#endif
 
 static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
 

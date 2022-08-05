@@ -22,9 +22,11 @@ void format_current_time(char* buf) {
 }
 
 void print_client_connected(char* addr, uint16_t port, int client_fd) {
+#ifdef __LOG_REQUESTS__
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
     printf("INFO [%s] [access] %s:%d connected on fd=%d...\n", time_buf, addr, port, client_fd);
+#endif
 }
 
 double timespec_difftime(timespec* start, timespec* finish) {
@@ -45,6 +47,7 @@ void print_client_request_resolution(
         const char* protocol, int status, const char* status_str, 
         size_t request_content_len, size_t response_content_len, 
         timespec* connected, timespec* connect_finish, timespec* send_begin) {
+#ifdef __LOG_REQUESTS__
     timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
     
@@ -76,6 +79,7 @@ void print_client_request_resolution(
         receive_duration, process_duration, send_duration, total_duration, 
         receive_speed, send_speed
     );
+#endif
 }
 
 void print_server_details(char* port) {

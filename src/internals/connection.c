@@ -22,11 +22,11 @@
 
 #define DEFAULT_RCV_BUFFER_SIZE (1UL << 13UL)
 #define MAX_RCV_BUFFER_SIZE (1UL << 23UL)
-#define MIN_RCV_CLKS 15
+#define MIN_RCV_CLKS 10
 
 #define DEFAULT_SND_BUFFER_SIZE (1UL << 16UL)
 #define MAX_SND_BUFFER_SIZE (1UL << 18UL)
-#define MIN_SND_CLKS 15
+#define MIN_SND_CLKS 10
 
 #define MAX_BUFFER_SIZE MAX_RCV_BUFFER_SIZE
 
@@ -226,7 +226,6 @@ void connection_try_parse_headers(connection_t* conn) {
         }
 
         if ( token ) {
-            LOG("[%s]=[%s]", key, token);
             dictionary_set(conn->request->headers, key, token);
         } 
     }

@@ -56,6 +56,7 @@ void allocate_handler_array(node_t* node) {
     node->handlers = calloc(NUM_HTTP_METHODS, sizeof(request_handler_t));
 }
 
+/// @todo investigate segfault on /
 void register_route(http_method method, const char* route, request_handler_t handler) {
     if ( method == HTTP_UNKNOWN )
         errx(EXIT_FAILURE, "Cannot register handler for HTTP_UNKNOWN");
@@ -67,7 +68,8 @@ void register_route(http_method method, const char* route, request_handler_t han
     if ( !root )
         root = node_init("");
 
-    char* route_str = strdup(route + 1);
+    char* route_dup = strdup(route + 1);
+    char* route_str = route_dup;
     char* token = NULL;
     node_t* curr = root;
     while ( ( token = strsep(&route_str, URL_SEP) ) ) {
@@ -87,11 +89,12 @@ void register_route(http_method method, const char* route, request_handler_t han
         WARN("Redefinition of route '%s %s'", http_method_to_string(method), route);
 
     curr->handlers[method] = handler;
-    free(route_str);
+    free(route_dup);
 }
 
 request_handler_t get_handler(http_method method, const char* route) {
-    char* route_str = strdup(route + 1);
+    char* route_dup = strdup(route + 1);
+    char* route_str = route_dup;
     char* token = NULL;
     node_t* curr = root;
     while ( ( token = strsep(&route_str, URL_SEP) ) ) {
@@ -99,13 +102,15 @@ request_handler_t get_handler(http_method method, const char* route) {
             break;
 
         /// @todo handle variable case
-        if ( !dictionary_contains(curr->const_children, token) )
+        if ( !dictionary_contains(curr->const_children, token) ) {
+            free(route_dup);
             return NULL;
+        }
 
         curr = dictionary_get(curr->const_children, token);
     }
 
-    free(route_str);
+    free(route_dup);
     if ( curr->handlers )
         return curr->handlers[(size_t) method];
 

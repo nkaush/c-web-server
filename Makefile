@@ -17,6 +17,7 @@ LD = clang
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
 INC = -I./includes/
 CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
+CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 
@@ -48,6 +49,7 @@ $(OBJS_DIR):
 
 .PHONY: print 
 print:
+	echo $(OBJS_LIBS)
 	echo $(TEST_SRC_FILES)
 	echo $(TEST_OBJS)
 	echo $(TEST_EXES)

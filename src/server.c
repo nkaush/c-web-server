@@ -18,9 +18,12 @@
 #define MAX_FILE_DESCRIPTORS 1024
 #define TIMEOUT_MS 1000
 
+/// @todo add a changelist so we don't have to call kevent a bunch of times - maybe a new function? + function to reset changelist
 #if defined(__APPLE__)
 #include <sys/event.h>
 static struct kevent* events_array = NULL;
+static struct kevent* change_list = NULL;
+static size_t changes_queued = 0;
 #elif defined(__linux__)
 #include <sys/epoll.h>
 static struct epoll_event* events_array = NULL;
@@ -74,6 +77,7 @@ void handle_sigpipe(int signal) { (void)signal; WARN("SIGPIPE"); }
 void server_setup_resources(void) {
 #if defined(__APPLE__)
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
+    change_list = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct kevent));
 #elif defined(__linux__)
     events_array = calloc(MAX_FILE_DESCRIPTORS, sizeof(struct epoll_event));
 #endif
@@ -89,6 +93,17 @@ void server_setup_resources(void) {
 
     if ( sigaction(SIGPIPE, &sigpipe_action, NULL) < 0 )
         err(EXIT_FAILURE, "sigaction SIGPIPE");
+}
+
+void queue_event_change(int16_t filter, int fd, void* data) {
+    LOG("Adding filter %d on fd=%d", filter, fd);
+    EV_SET(change_list + changes_queued, fd, filter, EV_ADD, 0, 0, data);  // add EV_CLEAR?
+    ++changes_queued;
+}
+
+void reset_queued_events(void) { 
+    memset(change_list, 0, changes_queued * sizeof(kevent));
+    changes_queued = 0; 
 }
 
 // Handle an kqueue event triggered from a client requesting to connect.
@@ -118,15 +133,16 @@ int server_handle_new_client(void) {
         connection_t* connection = connection_init(&c_init);
     
 #if defined(__APPLE__)
-        struct kevent client_event;
-        uint16_t flags = EV_ADD; // add EV_CLEAR?
-        EV_SET(&client_event, client_fd, EVFILT_READ, flags, 0, 0, connection);
+        queue_event_change(EVFILT_READ, client_fd, connection);
+        // struct kevent client_event;
+        // uint16_t flags = EV_ADD; // add EV_CLEAR?
+        // EV_SET(&client_event, client_fd, EVFILT_READ, flags, 0, 0, connection);
 
-        if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
-            err(EXIT_FAILURE, "kevent register");
+        // if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
+        //     err(EXIT_FAILURE, "kevent register");
         
-        if ( client_event.flags & EV_ERROR )
-            errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
+        // if ( client_event.flags & EV_ERROR )
+        //     errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
 #elif defined(__linux__)
         struct epoll_event event = {0};
         LOG("creating epoll event for fd=%d", client_fd);
@@ -170,7 +186,6 @@ void server_handle_client(connection_t* c, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
     if ( c->state < CS_REQUEST_RECEIVED ) {
         if ( connection_read(c, event_data) <= 0 ) { return; }
-        LOG("[%s]", c->buf);
     }
 
     if ( c->state == CS_CLIENT_CONNECTED )
@@ -195,14 +210,15 @@ void server_handle_client(connection_t* c, size_t event_data) {
         c->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
-        struct kevent change_rd_to_wr, new_wr_event;
-        uint16_t flags = EV_ADD; // add EV_CLEAR?
-        EV_SET(&change_rd_to_wr, c->client_fd, EVFILT_WRITE, flags, 0, 0, c);
+        queue_event_change(EVFILT_WRITE, c->client_fd, c);
+        // struct kevent change_rd_to_wr, new_wr_event;
+        // uint16_t flags = EV_ADD; // add EV_CLEAR?
+        // EV_SET(&change_rd_to_wr, c->client_fd, EVFILT_WRITE, flags, 0, 0, c);
 
-        if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
-            err(EXIT_FAILURE, "kevent register");
+        // if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
+        //     err(EXIT_FAILURE, "kevent register");
 
-        event_data = new_wr_event.data;
+        event_data = free_bytes_in_wr_socket(c->client_fd);
 #endif
     }
 
@@ -222,7 +238,9 @@ void server_handle_client(connection_t* c, size_t event_data) {
                 &c->time_received, &c->time_begin_send
             );
 
-#if defined(__linux__)
+#if defined(__APPLE__)
+            // queue_event_change(EV_DELETE, c->client_fd, c);
+#elif defined(__linux__)
             if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, c->client_fd, NULL) < 0)
                 err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif
@@ -236,6 +254,9 @@ void server_cleanup(void) {
     LOG("Exiting server...");
     if ( events_array ) 
         free(events_array);
+
+    if ( change_list ) 
+        free(change_list);
     
     close(server_socket);
 }
@@ -285,7 +306,9 @@ void server_launch(void) {
     int num_events = 0;
     while ( !stop_server ) {
 #if defined(__APPLE__)
-        num_events = kevent(event_queue_fd, 0, 0, events_array, MAX_FILE_DESCRIPTORS, 0);
+        LOG("-------------------------------------")
+        num_events = kevent(event_queue_fd, change_list, changes_queued, events_array, MAX_FILE_DESCRIPTORS, 0);
+        reset_queued_events();
 #elif defined(__linux__)
         num_events = epoll_wait(event_queue_fd, events_array, MAX_FILE_DESCRIPTORS, TIMEOUT_MS);
 #endif
@@ -308,6 +331,11 @@ void server_launch(void) {
                 if ( events_array[i].flags & EV_EOF ) {
                     WARN("client on fd=%d disconnected", connection->client_fd);
                     close(fd);
+                    continue;
+                } 
+                else if ( events_array[i].flags & EV_ERROR ) {
+                    // errx(EXIT_FAILURE, "Event error: %s on fd=%d", strerror(events_array[i].data), fd);
+                    WARN("Event error: %s on fd=%d", strerror(events_array[i].data), fd);
                     continue;
                 }
 #elif defined(__linux__)
