@@ -14,14 +14,20 @@ typedef struct timespec timespec;
 
 void format_time(char* buf, time_t time) {
     struct tm gmt;
-    strftime(buf, TIME_BUFFER_SIZE, TIME_FMT, gmtime_r(&time, &gmt));
+    strftime(buf, TIME_BUFFER_SIZE, TIME_FMT_GMT, gmtime_r(&time, &gmt));
 }
 
 void format_current_time(char* buf) {
     format_time(buf, time(NULL));
 }
 
-void print_client_connected(char* addr, uint16_t port, int client_fd) {
+time_t parse_time_str(const char* time_buf) {
+    struct tm gmt;
+    strptime(time_buf, TIME_FMT_TZ, &gmt);
+    return mktime(&gmt);
+}
+
+void print_client_connected(const char* addr, uint16_t port, int client_fd) {
 #ifdef __LOG_REQUESTS__
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
@@ -29,7 +35,7 @@ void print_client_connected(char* addr, uint16_t port, int client_fd) {
 #endif
 }
 
-double timespec_difftime(timespec* start, timespec* finish) {
+double timespec_difftime(const timespec* start, const timespec* finish) {
     double delta = (finish->tv_sec - start->tv_sec) * NS_PER_SECOND;
     delta += (double) (finish->tv_nsec - start->tv_nsec);
     double duration = delta / NS_PER_SECOND;
@@ -82,7 +88,7 @@ void print_client_request_resolution(
 #endif
 }
 
-void print_server_details(char* port) {
+void print_server_details(const char* port) {
     char host_buffer[256];
     
     int hostname = gethostname(host_buffer, sizeof(host_buffer));

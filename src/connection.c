@@ -2,6 +2,7 @@
 #include "format.h"
 
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -226,6 +227,8 @@ void connection_try_parse_headers(connection_t* conn) {
             break;
         }
 
+        LOG("[%s] = [%s]", key, token);
+
         if ( token ) {
             dictionary_set(conn->request->headers, key, token);
         } 
@@ -297,6 +300,8 @@ int format_response_header(response_t* response, char** buffer) {
         char* buffer = NULL;
         allocated_space += asprintf(&buffer, HEADER_FMT, key, value);
 
+        LOG("[%s] = [%s]", key, value);
+
         vector_push_back(formatted_headers, buffer);
         free(buffer);
     }
@@ -321,6 +326,33 @@ int format_response_header(response_t* response, char** buffer) {
 }
 
 void connection_write_response_header(connection_t* connection) {
+#ifndef __DISABLE_FILE_AUTO_CACHE__
+    static char* IF_MODIFIED_SINCE_HEADER_KEY = "If-Modified-Since";
+    response_t* response = connection->response;
+
+    if ( response->rt == RT_FILE ) {
+        dictionary* request_headers = connection->request->headers;
+
+        if ( dictionary_contains(request_headers, IF_MODIFIED_SINCE_HEADER_KEY)) {
+            char* header_value = 
+                dictionary_get(request_headers, IF_MODIFIED_SINCE_HEADER_KEY);
+                struct stat info = { 0 };
+                if ( fstat(fileno(response->body_content.file), &info) != 0 )
+                    err(EXIT_FAILURE, "fstat");
+
+#if defined(__APPLE__)
+                time_t last_modified = info.st_mtimespec.tv_sec;
+#elif defined(__linux__)
+                time_t last_modified = info.st_mtim.tv_sec;
+#endif
+            if ( last_modified <= parse_time_str(header_value) ) {
+                response_destroy(connection->response);
+                connection->response = response_not_modified(NULL);
+            }
+        }
+    }
+#endif
+
     char* header_str = NULL;
     int header_len = format_response_header(connection->response, &header_str);
     
@@ -358,6 +390,9 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
         SET_RESPONSE_BODY_LENGTH_PARSED(conn);
         clock_gettime(CLOCK_REALTIME, &conn->time_begin_send);
     }
+
+    if ( response->rt == RT_EMPTY )
+        return 0;
 
     size_t to_send = conn->body_bytes_to_transmit - conn->body_bytes_transmitted;
     to_send = MIN(to_send, MIN(conn->buf_size, max_receivable));

@@ -6,17 +6,22 @@
 #include <time.h>
 #include <err.h>
 
-static char server_os[64] = { 0 };
+static char SERVER_OS[64] = { 0 };
 
-static char* DATE_HEADER_KEY = "Date";
-static char* SERVER_HEADER_KEY = "Server";
-static char* CONNECTION_HEADER_KEY = "Connection";
-static char* CONTENT_TYPE_HEADER_KEY = "Content-Type";
-static char* CONTENT_LENGTH_HEADER_KEY = "Content-Length";
-static char* LAST_MODIFIED_HEADER_KEY = "Last-Modified";
+static char* DATE_HEADER_KEY             = "Date";
+static char* SERVER_HEADER_KEY           = "Server";
+static char* CONNECTION_HEADER_KEY       = "Connection";
+static char* CONTENT_TYPE_HEADER_KEY     = "Content-Type";
+static char* CONTENT_LENGTH_HEADER_KEY   = "Content-Length";
+static char* LAST_MODIFIED_HEADER_KEY    = "Last-Modified";
+static char* EXPIRES_HEADER_KEY          = "Expires";
+static char* CACHE_CONTROL_HEADER_KEY    = "Cache-Control";
 
 // Format: (message, status code)
 static const char* JSON_ERROR_CONTENT_FMT = "{\"message\":\"%s\",\"code\":%d}";
+
+static int MAX_AGE = 604800; // default to 7 day max age
+static char CACHE_CONTROL_HEADER_VALUE[32] = { 0 };
 
 response_t* response_create(http_status status) {
     response_t* response = malloc(sizeof(response_t));
@@ -26,14 +31,14 @@ response_t* response_create(http_status status) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
 
-    if ( !(*server_os) ) {
+    if ( !(*SERVER_OS) ) {
         struct utsname uts;
         uname(&uts);
-        sprintf(server_os, "kqueue-epoll/0.0.1 (%s %s)", uts.sysname, uts.release);
+        sprintf(SERVER_OS, "kqueue-epoll/0.0.1 (%s %s)", uts.sysname, uts.release);
     }
 
     dictionary_set(response->headers, DATE_HEADER_KEY, time_buf);
-    dictionary_set(response->headers, SERVER_HEADER_KEY, server_os);
+    dictionary_set(response->headers, SERVER_HEADER_KEY, SERVER_OS);
 
     /// @todo make this dynamic
     dictionary_set(response->headers, CONNECTION_HEADER_KEY, "close");
@@ -69,6 +74,19 @@ response_t* response_from_file(http_status status, FILE* file) {
 #endif
     dictionary_set(response->headers, LAST_MODIFIED_HEADER_KEY, time_buf);
     response_set_content_length(response, (size_t) info.st_size);
+
+#ifndef __DISABLE_FILE_AUTO_CACHE__
+    if ( !(*CACHE_CONTROL_HEADER_VALUE) ) {
+        sprintf(CACHE_CONTROL_HEADER_VALUE, "max-age=%d", MAX_AGE);
+    }
+
+    response_set_header(
+        response, CACHE_CONTROL_HEADER_KEY, CACHE_CONTROL_HEADER_VALUE);
+
+    time_t expires = time(NULL) + MAX_AGE;
+    format_time(time_buf, expires);
+    response_set_header(response, EXPIRES_HEADER_KEY, time_buf);
+#endif
     
     return response;
 }
@@ -101,6 +119,11 @@ response_t* response_format_error(http_status status, const char* msg) {
     free(buf);
 
     return response;
+}
+
+response_t* response_not_modified(request_t* request) {
+    (void) request;
+    return response_empty(STATUS_NOT_MODIFIED);
 }
 
 response_t* response_malformed_request(request_t* request) {

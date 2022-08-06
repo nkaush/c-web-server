@@ -44,6 +44,9 @@ response_t* response_empty(http_status status);
 
 /// ERROR RESPONSE CONSTRUCTORS
 
+// Construct a response for 304 Not Modified
+response_t* response_not_modified(request_t* request);
+
 // Constructs a response for 400 Bad Response with a pre-populated json message
 response_t* response_malformed_request(request_t* request);
 

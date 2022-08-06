@@ -50,16 +50,20 @@
 #define WARN(...)
 #endif
 
-static const char* TIME_FMT = "%a, %d %b %Y %H:%M:%S GMT";
+static const char* TIME_FMT_GMT = "%a, %d %b %Y %H:%M:%S GMT";
 
-double timespec_difftime(struct timespec* start, struct timespec* finish);
+static const char* TIME_FMT_TZ = "%a, %d %b %Y %H:%M:%S %Z";
+
+double timespec_difftime(const struct timespec* beg, const struct timespec* end);
 
 void format_time(char* buf, time_t time);
 
 // buf must be a buffer of at least 30 characters
 void format_current_time(char* buf);
 
-void print_client_connected(char* addr, uint16_t port, int client_fd);
+time_t parse_time_str(const char* time_buf);
+
+void print_client_connected(const char* addr, uint16_t port, int client_fd);
 
 void print_client_request_resolution(
     const char* addr, uint16_t port, const char* method, const char* route,
@@ -68,6 +72,6 @@ void print_client_request_resolution(
     struct timespec* connected, struct timespec* connect_finish, 
     struct timespec* send_begin);
 
-void print_server_details(char* port);
+void print_server_details(const char* port);
 
 void print_server_ready(void);

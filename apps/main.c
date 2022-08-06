@@ -1,34 +1,20 @@
-#include "route.h"
-
-response_t* root(request_t* request) { return NULL; }
-
-response_t* get(request_t* request) { return NULL; }
-
-response_t* post(request_t* request) { return NULL; }
+#include "format.h"
+#include <assert.h>
 
 int main(int argc, char** argv) {
-    register_route(HTTP_GET, "/", root);
-    register_route(HTTP_GET, "/v1/api/test", get);
-    register_route(HTTP_POST, "/v1/api/test", post);
+    time_t expires = time(NULL) + 691200;
+    char buf[TIME_BUFFER_SIZE] = { 0 };
+    format_time(buf, expires);
 
-    request_handler_t h = get_handler(HTTP_GET, "/v1/api/test");
-    printf("expected: %p vs actual %p\n", get, h);
+    LOG("%s", buf);
 
-    h = get_handler(HTTP_POST, "/v1/api/test");
-    printf("expected: %p vs actual %p\n", post, h);
+    time_t parsed = parse_time_str(buf);
 
-    h = get_handler(HTTP_POST, "/v1/api/test/");
-    printf("expected: %p vs actual %p\n", post, h);
+    struct tm gmt;
+    strptime(buf, TIME_FMT_TZ, &gmt);
+    time_t gmt_parsed = mktime(&gmt);
 
-    h = get_handler(HTTP_GET, "/");
-    printf("expected: %p vs actual %p\n", root, h);
-
-    h = get_handler(HTTP_DELETE, "/v1/api/test");
-    printf("expected: %p vs actual %p\n", NULL, h);
-
-    h = get_handler(HTTP_GET, "/v2/");
-    printf("expected: %p vs actual %p\n", NULL, h);
-
-    h = get_handler(HTTP_DELETE, "/v1/api/");
-    printf("expected: %p vs actual %p\n", NULL, h);
+    LOG("original = %ld / parsed1 = %ld / parsed2 = %ld", expires, parsed, gmt_parsed);
+    assert(expires == parsed);
+    assert(expires == gmt_parsed);
 }
