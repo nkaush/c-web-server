@@ -9,7 +9,20 @@ response_t* post(request_t* request) { (void) request; return NULL; }
 
 response_t* favicon(request_t* request) { (void) request; return NULL; }
 
+#if defined(__APPLE__) && defined(DEBUG)
+#include <unistd.h>
+void check_leaks(void) {
+    char cmd[100];
+    sprintf(cmd, "leaks --list %d", getpid());
+    printf("%s\n", cmd);
+    system(cmd);
+}  
+#endif
+
 int main(void) {
+#if defined(__APPLE__) && defined(DEBUG)
+    atexit(check_leaks);
+#endif
     // register_route(HTTP_GET, "/", root);
     register_route(HTTP_GET, "/favicon.ico", favicon);
     register_route(HTTP_GET, "/v1/api/test", get);

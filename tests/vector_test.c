@@ -1,6 +1,4 @@
 #include "libs/vector.h"
-
-#include <unistd.h>
 #include <stdio.h>
 
 #define BOLDGREEN "\033[1m\033[32m"
@@ -300,6 +298,7 @@ int test_vector_insert(void) {
 }
 
 #if defined(__APPLE__) && defined(DEBUG)
+#include <unistd.h>
 void check_leaks(void) {
     char cmd[100];
     sprintf(cmd, "leaks --list %d", getpid());
@@ -309,6 +308,7 @@ void check_leaks(void) {
 #endif
 
 int main(int argc, char** argv) {
+    (void) argc;
 #if defined(__APPLE__) && defined(DEBUG)
     atexit(check_leaks);
 #endif

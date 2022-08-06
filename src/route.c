@@ -112,7 +112,7 @@ route_handler_t find_route_handler(http_method method, const char* route) {
         /// @todo handle variable case
         if ( !dictionary_contains(curr->const_children, token) ) {
             free(route_dup);
-            return NULL;
+            return RH_NOT_FOUND;
         }
 
         curr = dictionary_get(curr->const_children, token);
