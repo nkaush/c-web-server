@@ -177,7 +177,7 @@ void connection_try_parse_url(connection_t* conn) {
 
     if ( length >= MAX_URL_LENGTH ) {
         conn->state = CS_WRITING_RESPONSE_HEADER;
-        conn->response = response_uri_too_long();
+        conn->response = response_uri_too_long(NULL);
         return;
     }
 
@@ -252,7 +252,7 @@ void connection_read_request_body(connection_t* conn) {
 
         if ( !dictionary_contains(request->headers, CONTENT_LENGTH_HEADER_KEY) ) {
             conn->state = CS_WRITING_RESPONSE_HEADER;
-            conn->response = response_length_required();
+            conn->response = response_length_required(NULL);
             return;
         }
 

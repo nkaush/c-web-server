@@ -8,9 +8,9 @@
 static node_t* root = NULL;
 static const char* URL_SEP = "/";
 
-static response_error_constructor_t RH_METHOD_NOT_ALLOWED = response_method_not_allowed;
-static response_error_constructor_t RH_MALFORMED_REQUEST = response_malformed_request;
-static response_error_constructor_t RH_NOT_FOUND = response_resource_not_found;
+static route_handler_t RH_METHOD_NOT_ALLOWED = response_method_not_allowed;
+static route_handler_t RH_MALFORMED_REQUEST = response_malformed_request;
+static route_handler_t RH_NOT_FOUND = response_resource_not_found;
 
 void* __node_init(void* ptr) {
     return node_init(ptr);
@@ -58,11 +58,11 @@ void node_destroy(node_t* node) {
 }
 
 void allocate_handler_array(node_t* node) {
-    node->handlers = calloc(NUM_HTTP_METHODS, sizeof(request_handler_t));
+    node->handlers = calloc(NUM_HTTP_METHODS, sizeof(route_handler_t));
 }
 
 /// @todo investigate segfault on /
-void register_route(http_method method, const char* route, request_handler_t handler) {
+void register_route(http_method method, const char* route, route_handler_t handler) {
     if ( method == HTTP_UNKNOWN )
         errx(EXIT_FAILURE, "Cannot register handler for HTTP_UNKNOWN");
     else if ( !route ) 
@@ -97,11 +97,11 @@ void register_route(http_method method, const char* route, request_handler_t han
     free(route_dup);
 }
 
-response_t* handle_route(request_t* request) {
-    if ( request->method == HTTP_UNKNOWN )
-        return RH_MALFORMED_REQUEST();
+route_handler_t find_route_handler(http_method method, const char* route) {
+    if ( method == HTTP_UNKNOWN )
+        return RH_MALFORMED_REQUEST;
 
-    char* route_dup = strdup(request->path + 1);
+    char* route_dup = strdup(route + 1);
     char* route_str = route_dup;
     char* token = NULL;
     node_t* curr = root;
@@ -120,13 +120,13 @@ response_t* handle_route(request_t* request) {
 
     free(route_dup);
     if ( curr->handlers ) { // the route exists...
-        request_handler_t handler = curr->handlers[request->method];
+        route_handler_t handler = curr->handlers[method];
 
         if ( !handler ) // however, the route is not defined for the requested method
-            return RH_METHOD_NOT_ALLOWED();
+            return RH_METHOD_NOT_ALLOWED;
 
-        return handler(request);
+        return handler;
     } else { // the route does not exist...
-        return RH_NOT_FOUND();
+        return RH_NOT_FOUND;
     }
 }

@@ -184,7 +184,8 @@ void server_handle_client(connection_t* c, size_t event_data) {
         connection_read_request_body(c);
 
     if ( c->state == CS_REQUEST_RECEIVED ) {
-        c->response = handle_route(c->request);
+        request_t* req = c->request;
+        c->response = find_route_handler(req->method, req->path)(req);
         c->state = CS_WRITING_RESPONSE_HEADER;
 
 #if defined(__APPLE__)
@@ -335,6 +336,6 @@ void server_launch(void) {
     }
 }
 
-void server_register_route(http_method method, char* route, request_handler_t handler) {
+void server_register_route(http_method method, char* route, route_handler_t handler) {
     register_route(method, route, handler);
 }

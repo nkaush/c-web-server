@@ -13,4 +13,4 @@ void server_init(char* port);
 void server_launch(void);
 
 // Register a handler function to respond to the specified method and route.
-void server_register_route(http_method http_method, char* route, request_handler_t handler);
+void server_register_route(http_method http_method, char* route, route_handler_t handler);

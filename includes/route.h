@@ -6,9 +6,7 @@
 // This handler function type will receive a request_t struct and must return 
 // the response body that must be send to the client in response to the route 
 // this handler serves.
-typedef response_t* (*request_handler_t)(request_t*);
-
-typedef response_t* (*response_error_constructor_t)(void);
+typedef response_t* (*route_handler_t)(request_t*);
 
 typedef enum _url_component_type {
     UCT_CONSTANT,
@@ -20,13 +18,13 @@ typedef struct _node {
     dictionary* const_children;
     dictionary* var_children;
     url_component_type_t uct;
-    request_handler_t* handlers;
+    route_handler_t* handlers;
 } node_t;
 
 node_t* node_init(char* component);
 
 void node_destroy(node_t* node);
 
-void register_route(http_method method, const char* route, request_handler_t handler);
+void register_route(http_method method, const char* route, route_handler_t handler);
 
-response_t* handle_route(request_t* request);
+route_handler_t find_route_handler(http_method method, const char* route);
