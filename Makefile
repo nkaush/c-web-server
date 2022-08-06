@@ -25,8 +25,8 @@ CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 # LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 
 # Find object files for libraries
-LIBS_SRC_FILES:=$(wildcard $(LIBS_DIR)/*.c)
-OBJS_LIBS:=$(patsubst $(LIBS_DIR)/%.c,%.o,$(LIBS_SRC_FILES))
+OBJS_LIBS:=$(patsubst $(LIBS_DIR)/%.c,%.o,$(wildcard $(LIBS_DIR)/*.c))
+OBJS_SRC :=$(patsubst $(SRC_DIR)/%.c,%.o,$(wildcard $(SRC_DIR)/*.c))
 
 # Find object files for internals
 INTERNALS_SRC_FILES:=$(wildcard $(INTERNALS_SRC_DIR)/*.c)
@@ -36,9 +36,8 @@ TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
 OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_INTERNAL) $(OBJS_LIBS)
-OBJS_HTTP   = request.o response.o protocol.o route.o
-OBJS_TEST   = $(OBJS_HTTP) $(OBJS_LIBS) $(OBJS_INTERNAL)
-OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) $(OBJS_HTTP) server.o 
+OBJS_TEST   = $(OBJS_SRC) $(OBJS_LIBS) $(OBJS_INTERNAL)
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) $(OBJS_SRC)
 OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_LIBS) route.o request.o response.o protocol.o format.o
 
 .PHONY: all
@@ -49,10 +48,7 @@ $(OBJS_DIR):
 
 .PHONY: print 
 print:
-	echo $(OBJS_LIBS)
-	echo $(TEST_SRC_FILES)
-	echo $(TEST_OBJS)
-	echo $(TEST_EXES)
+	echo $(OBJS_SRC)
 
 # build types
 .PHONY: release
@@ -81,13 +77,6 @@ $(OBJS_DIR)/%-debug.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
 
 $(OBJS_DIR)/%-release.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
-	$(CC) $(CFLAGS_RELEASE) $< -o $@
-
-# Define rules to compile object files for internals
-$(OBJS_DIR)/%-debug.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
-	$(CC) $(CFLAGS_DEBUG) $< -o $@
-
-$(OBJS_DIR)/%-release.o: $(INTERNALS_SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
 # Define rules to compile object files for apps

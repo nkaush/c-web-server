@@ -1,4 +1,4 @@
-#include "internals/format.h"
+#include "format.h"
 
 #include <arpa/inet.h>
 #include <unistd.h>

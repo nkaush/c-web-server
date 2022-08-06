@@ -1,5 +1,5 @@
 #include "route.h"
-#include "internals/format.h"
+#include "format.h"
 
 #include <err.h>
 

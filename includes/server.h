@@ -1,6 +1,6 @@
 #pragma once
-#include "internals/connection.h"
-#include "internals/io_utils.h"
+#include "connection.h"
+#include "io_utils.h"
 #include "protocol.h"
 #include "response.h"
 #include "request.h"

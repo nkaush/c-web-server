@@ -1,5 +1,5 @@
 #include "request.h"
-#include "internals/format.h"
+#include "format.h"
 
 request_t* request_create(http_method method) {
     request_t* request = malloc(sizeof(request_t));

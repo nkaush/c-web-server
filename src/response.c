@@ -1,5 +1,5 @@
 #include "response.h"
-#include "internals/format.h"
+#include "format.h"
 
 #include <sys/utsname.h>
 #include <sys/stat.h>

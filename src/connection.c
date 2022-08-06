@@ -1,5 +1,6 @@
-#include "internals/connection.h"
-#include "internals/format.h"
+#include "connection.h"
+#include "format.h"
+
 #include <sys/socket.h>
 #include <string.h>
 #include <unistd.h>
