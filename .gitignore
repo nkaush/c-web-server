@@ -9,6 +9,7 @@ main
 
 # Prerequisites
 *.d
+!trace/*.d
 
 # Object files
 *.o
