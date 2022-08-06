@@ -5,6 +5,24 @@
 #include "response.h"
 #include "request.h"
 
+#define REQUEST_BODY_LENGTH_PARSED 0x01
+#define RESPONSE_BODY_LENGTH_PARSED 0x02
+#define MULTI_CYCLE_RESPONSE_DELIVERY 0x04
+
+#define SET_REQUEST_BODY_LENGTH_PARSED(connection) \
+    do { connection->flags |= REQUEST_BODY_LENGTH_PARSED; } while (0)
+#define SET_RESPONSE_BODY_LENGTH_PARSED(connection) \
+    do { connection->flags |= RESPONSE_BODY_LENGTH_PARSED; } while (0)
+#define SET_MULTI_CYCLE_RESPONSE_DELIVERY(connection) \
+    do { connection->flags |= MULTI_CYCLE_RESPONSE_DELIVERY; } while (0)
+
+#define WAS_REQUEST_BODY_LENGTH_PARSED(connection) \
+    (connection->flags & REQUEST_BODY_LENGTH_PARSED)
+#define WAS_RESPONSE_BODY_LENGTH_PARSED(connection) \
+    (connection->flags & RESPONSE_BODY_LENGTH_PARSED)
+#define IS_MULTI_CYCLE_RESPONSE_DELIVERY(connection) \
+    (connection->flags & MULTI_CYCLE_RESPONSE_DELIVERY)
+
 typedef struct _connection_initializer {
     char* client_address;
     int client_fd;

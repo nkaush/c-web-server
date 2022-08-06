@@ -9,19 +9,6 @@
 #include <errno.h>
 #include <err.h>
 
-#define REQUEST_BODY_LENGTH_PARSED 0x01
-#define RESPONSE_BODY_LENGTH_PARSED 0x02
-
-#define SET_REQUEST_BODY_LENGTH_PARSED(connection) \
-    do { connection->flags |= REQUEST_BODY_LENGTH_PARSED; } while (0)
-#define SET_RESPONSE_BODY_LENGTH_PARSED(connection) \
-    do { connection->flags |= RESPONSE_BODY_LENGTH_PARSED; } while (0)
-
-#define WAS_REQUEST_BODY_LENGTH_PARSED(connection) \
-    (connection->flags & REQUEST_BODY_LENGTH_PARSED)
-#define WAS_RESPONSE_BODY_LENGTH_PARSED(connection) \
-    (connection->flags & RESPONSE_BODY_LENGTH_PARSED)
-
 #define DEFAULT_RCV_BUFFER_SIZE (1UL << 13UL)
 #define MAX_RCV_BUFFER_SIZE (1UL << 23UL)
 #define MIN_RCV_CLKS 10
@@ -170,13 +157,14 @@ void connection_try_parse_verb(connection_t* conn) {
 }
 
 void connection_try_parse_url(connection_t* conn) {
+    /// @todo make the buffer ~2064ish bytes to only parse the method, url, and protocol, then resize to 8192 to parse headers
     char* url_start = conn->buf + conn->buf_ptr;
     char* idx_space = strstr(url_start, " ");
 
     // DO NOT add 1 since we are excluding the space from the length
     size_t length = (size_t) idx_space - (size_t) url_start;
 
-    if ( length >= MAX_URL_LENGTH ) {
+    if ( length > MAX_URL_LENGTH ) {
         conn->state = CS_WRITING_RESPONSE_HEADER;
         conn->response = response_uri_too_long(NULL);
         return;
@@ -226,8 +214,6 @@ void connection_try_parse_headers(connection_t* conn) {
             conn->buf_ptr = (key - conn->buf) + 2;
             break;
         }
-
-        LOG("[%s] = [%s]", key, token);
 
         if ( token ) {
             dictionary_set(conn->request->headers, key, token);
@@ -300,8 +286,6 @@ int format_response_header(response_t* response, char** buffer) {
         char* buffer = NULL;
         allocated_space += asprintf(&buffer, HEADER_FMT, key, value);
 
-        LOG("[%s] = [%s]", key, value);
-
         vector_push_back(formatted_headers, buffer);
         free(buffer);
     }
@@ -326,7 +310,7 @@ int format_response_header(response_t* response, char** buffer) {
 }
 
 void connection_write_response_header(connection_t* connection) {
-#ifndef __DISABLE_FILE_AUTO_CACHE__
+#ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
     static char* IF_MODIFIED_SINCE_HEADER_KEY = "If-Modified-Since";
     response_t* response = connection->response;
 
@@ -336,14 +320,14 @@ void connection_write_response_header(connection_t* connection) {
         if ( dictionary_contains(request_headers, IF_MODIFIED_SINCE_HEADER_KEY)) {
             char* header_value = 
                 dictionary_get(request_headers, IF_MODIFIED_SINCE_HEADER_KEY);
-                struct stat info = { 0 };
-                if ( fstat(fileno(response->body_content.file), &info) != 0 )
-                    err(EXIT_FAILURE, "fstat");
+            struct stat info = { 0 };
+            if ( fstat(fileno(response->body_content.file), &info) != 0 )
+                err(EXIT_FAILURE, "fstat");
 
 #if defined(__APPLE__)
-                time_t last_modified = info.st_mtimespec.tv_sec;
+            time_t last_modified = info.st_mtimespec.tv_sec;
 #elif defined(__linux__)
-                time_t last_modified = info.st_mtim.tv_sec;
+            time_t last_modified = info.st_mtim.tv_sec;
 #endif
             if ( last_modified <= parse_time_str(header_value) ) {
                 response_destroy(connection->response);

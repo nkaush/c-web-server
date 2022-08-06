@@ -18,7 +18,6 @@
 #define MAX_FILE_DESCRIPTORS 1024
 #define TIMEOUT_MS 1000
 
-/// @todo add a changelist so we don't have to call kevent a bunch of times - maybe a new function? + function to reset changelist
 #if defined(__APPLE__)
 #include <sys/event.h>
 static struct kevent* events_array = NULL;
@@ -101,6 +100,12 @@ void queue_event_change(int16_t filter, int fd, void* data) {
     ++changes_queued;
 }
 
+void queue_event_delete(int fd) {
+    LOG("Deleting filter on fd=%d", fd);
+    EV_SET(change_list + changes_queued, fd, 0, EV_DELETE, 0, 0, NULL);
+    ++changes_queued;
+}
+
 void reset_queued_events(void) { 
     memset(change_list, 0, changes_queued * sizeof(kevent));
     changes_queued = 0; 
@@ -134,15 +139,6 @@ int server_handle_new_client(void) {
     
 #if defined(__APPLE__)
         queue_event_change(EVFILT_READ, client_fd, connection);
-        // struct kevent client_event;
-        // uint16_t flags = EV_ADD; // add EV_CLEAR?
-        // EV_SET(&client_event, client_fd, EVFILT_READ, flags, 0, 0, connection);
-
-        // if ( kevent(event_queue_fd, &client_event, 1, NULL, 0, NULL) == -1 ) 
-        //     err(EXIT_FAILURE, "kevent register");
-        
-        // if ( client_event.flags & EV_ERROR )
-        //     errx(EXIT_FAILURE, "Event error: %s", strerror(client_event.data));
 #elif defined(__linux__)
         struct epoll_event event = {0};
         LOG("creating epoll event for fd=%d", client_fd);
@@ -187,19 +183,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
         request_t* req = c->request;
         c->response = find_route_handler(req->method, req->path)(req);
         c->state = CS_WRITING_RESPONSE_HEADER;
-
-#if defined(__APPLE__)
-        /// @todo only add this event if we need to continue writing to the fd after this function finishes
-        queue_event_change(EVFILT_WRITE, c->client_fd, c);
-        // struct kevent change_rd_to_wr, new_wr_event;
-        // uint16_t flags = EV_ADD; // add EV_CLEAR?
-        // EV_SET(&change_rd_to_wr, c->client_fd, EVFILT_WRITE, flags, 0, 0, c);
-
-        // if ( kevent(event_queue_fd, &change_rd_to_wr, 1, &new_wr_event, 1, 0) == -1 ) 
-        //     err(EXIT_FAILURE, "kevent register");
-
         event_data = free_bytes_in_wr_socket(c->client_fd);
-#endif
     }
 
     if ( c->state == CS_WRITING_RESPONSE_HEADER )
@@ -219,12 +203,17 @@ void server_handle_client(connection_t* c, size_t event_data) {
             );
 
 #if defined(__APPLE__)
-            // queue_event_change(EV_DELETE, c->client_fd, c);
+            /// @todo investigate if we really need this since we fixed the issue with close before register
+            // if ( IS_MULTI_CYCLE_RESPONSE_DELIVERY(c) )
+            //     queue_event_delete(c->client_fd);
 #elif defined(__linux__)
             if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, c->client_fd, NULL) < 0)
                 err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif
             connection_destroy(c);
+        } else if ( !IS_MULTI_CYCLE_RESPONSE_DELIVERY(c) ) {
+            SET_MULTI_CYCLE_RESPONSE_DELIVERY(c);
+            queue_event_change(EVFILT_WRITE, c->client_fd, c);
         }
     }
 }
@@ -286,7 +275,6 @@ void server_launch(void) {
     int num_events = 0;
     while ( !stop_server ) {
 #if defined(__APPLE__)
-        LOG("-------------------------------------")
         num_events = kevent(event_queue_fd, change_list, changes_queued, events_array, MAX_FILE_DESCRIPTORS, 0);
         reset_queued_events();
 #elif defined(__linux__)
@@ -300,8 +288,7 @@ void server_launch(void) {
 #elif defined(__linux__)
             int fd = events_array[i].data.fd;
 #endif
-            if (fd == server_socket) { 
-                // we have a new connection to the server
+            if (fd == server_socket) { // we have a new connection to the server
                 server_handle_new_client();
             } else {
 #if defined(__APPLE__)
@@ -312,9 +299,7 @@ void server_launch(void) {
                     WARN("client on fd=%d disconnected", connection->client_fd);
                     close(fd);
                     continue;
-                } 
-                else if ( events_array[i].flags & EV_ERROR ) {
-                    // errx(EXIT_FAILURE, "Event error: %s on fd=%d", strerror(events_array[i].data), fd);
+                } else if ( events_array[i].flags & EV_ERROR ) {
                     WARN("Event error: %s on fd=%d", strerror(events_array[i].data), fd);
                     continue;
                 }
