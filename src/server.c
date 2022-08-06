@@ -95,19 +95,17 @@ void server_setup_resources(void) {
 }
 
 void queue_event_change(int16_t filter, int fd, void* data) {
-    LOG("Adding filter %d on fd=%d", filter, fd);
     EV_SET(change_list + changes_queued, fd, filter, EV_ADD, 0, 0, data);  // add EV_CLEAR?
     ++changes_queued;
 }
 
 void queue_event_delete(int fd) {
-    LOG("Deleting filter on fd=%d", fd);
     EV_SET(change_list + changes_queued, fd, 0, EV_DELETE, 0, 0, NULL);
     ++changes_queued;
 }
 
 void reset_queued_events(void) { 
-    memset(change_list, 0, changes_queued * sizeof(kevent));
+    memset(change_list, 0, changes_queued * sizeof(struct kevent));
     changes_queued = 0; 
 }
 
@@ -159,7 +157,6 @@ void server_handle_client(connection_t* c, size_t event_data) {
     /// @todo split function into 2 for handling read and handling write
     if ( c->state < CS_REQUEST_RECEIVED ) {
         if ( connection_read(c, event_data) <= 0 ) { return; }
-        LOG("%s", c->buf);
     }
 
     if ( c->state == CS_CLIENT_CONNECTED )
@@ -191,6 +188,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
 
     if ( c->state == CS_WRITING_RESPONSE_BODY ) {
         if ( !connection_try_send_response_body(c, event_data) ) {
+#ifdef __LOG_REQUESTS__
             const char* http_method_str = http_method_to_string(c->request->method);
             const char* http_status_str = http_status_to_string(c->response->status);
 
@@ -201,7 +199,7 @@ void server_handle_client(connection_t* c, size_t event_data) {
                 c->body_bytes_to_transmit, &c->time_connected,
                 &c->time_received, &c->time_begin_send
             );
-
+#endif
 #if defined(__APPLE__)
             /// @todo investigate if we really need this since we fixed the issue with close before register
             // if ( IS_MULTI_CYCLE_RESPONSE_DELIVERY(c) )

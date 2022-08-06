@@ -76,9 +76,8 @@ response_t* response_from_file(http_status status, FILE* file) {
     response_set_content_length(response, (size_t) info.st_size);
 
 #ifndef __DISABLE_FILE_AUTO_CACHE__
-    if ( !(*CACHE_CONTROL_HEADER_VALUE) ) {
+    if ( !(*CACHE_CONTROL_HEADER_VALUE) )
         sprintf(CACHE_CONTROL_HEADER_VALUE, "max-age=%d", MAX_AGE);
-    }
 
     response_set_header(
         response, CACHE_CONTROL_HEADER_KEY, CACHE_CONTROL_HEADER_VALUE);

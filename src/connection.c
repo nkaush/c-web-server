@@ -26,7 +26,10 @@ void* connection_init(void* ptr) {
 
     connection_t* this = malloc(sizeof(connection_t));
     this->state = CS_CLIENT_CONNECTED;
+
+#ifdef __LOG_REQUESTS__
     clock_gettime(CLOCK_REALTIME, &this->time_connected);
+#endif
 
     this->buf = calloc(DEFAULT_RCV_BUFFER_SIZE, sizeof(char));
     this->buf_size = DEFAULT_RCV_BUFFER_SIZE;
@@ -268,7 +271,9 @@ void connection_read_request_body(connection_t* conn) {
     size_t byte_diff = conn->body_bytes_to_receive - conn->body_bytes_received;
     if ( (is_put_or_post && byte_diff == 0) || !is_put_or_post ) {
         conn->state = CS_REQUEST_RECEIVED;
+#ifdef __LOG_REQUESTS__
         clock_gettime(CLOCK_REALTIME, &conn->time_received);
+#endif
     }
 }
 
@@ -320,15 +325,11 @@ void connection_write_response_header(connection_t* connection) {
         if ( dictionary_contains(request_headers, IF_MODIFIED_SINCE_HEADER_KEY)) {
             char* header_value = 
                 dictionary_get(request_headers, IF_MODIFIED_SINCE_HEADER_KEY);
-            struct stat info = { 0 };
-            if ( fstat(fileno(response->body_content.file), &info) != 0 )
-                err(EXIT_FAILURE, "fstat");
 
-#if defined(__APPLE__)
-            time_t last_modified = info.st_mtimespec.tv_sec;
-#elif defined(__linux__)
-            time_t last_modified = info.st_mtim.tv_sec;
-#endif
+            char* last_modified_str = 
+                dictionary_get(connection->response->headers, "Last-Modified");
+            time_t last_modified = parse_time_str(last_modified_str);
+
             if ( last_modified <= parse_time_str(header_value) ) {
                 response_destroy(connection->response);
                 connection->response = response_not_modified(NULL);
@@ -372,7 +373,9 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
 
         allocate_buffer_for_response(conn);
         SET_RESPONSE_BODY_LENGTH_PARSED(conn);
+#ifdef __LOG_REQUESTS__
         clock_gettime(CLOCK_REALTIME, &conn->time_begin_send);
+#endif
     }
 
     if ( response->rt == RT_EMPTY )

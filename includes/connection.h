@@ -56,9 +56,11 @@ typedef struct _connection {
     int client_fd;
     int buf_end;
     int buf_ptr;
+#ifdef __LOG_REQUESTS__
     struct timespec time_connected;
     struct timespec time_received;
     struct timespec time_begin_send;
+#endif
     uint16_t client_port; 
     uint8_t flags;
 } connection_t;

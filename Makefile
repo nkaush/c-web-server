@@ -2,8 +2,7 @@ OBJS_DIR     = .objs
 TEST_DIR     = tests
 SRC_DIR      = src
 APPS_DIR     = apps
-LIBS_DIR = $(SRC_DIR)/libs
-INTERNALS_SRC_DIR = $(SRC_DIR)/internals
+LIBS_DIR     = $(SRC_DIR)/libs
 
 EXE_SERVER = server
 EXE_CLIENT = client
@@ -17,9 +16,9 @@ LD = clang
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
 INC = -I./includes/
 CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
-CFLAGS_COMMON += -D__LOG_REQUESTS__
+# CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
-CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
+CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
 
 # CFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 # LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
@@ -28,16 +27,12 @@ CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG
 OBJS_LIBS:=$(patsubst $(LIBS_DIR)/%.c,%.o,$(wildcard $(LIBS_DIR)/*.c))
 OBJS_SRC :=$(patsubst $(SRC_DIR)/%.c,%.o,$(wildcard $(SRC_DIR)/*.c))
 
-# Find object files for internals
-INTERNALS_SRC_FILES:=$(wildcard $(INTERNALS_SRC_DIR)/*.c)
-OBJS_INTERNAL:=$(patsubst $(INTERNALS_SRC_DIR)/%.c,%.o,$(INTERNALS_SRC_FILES))
-
 TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
-OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_INTERNAL) $(OBJS_LIBS)
-OBJS_TEST   = $(OBJS_SRC) $(OBJS_LIBS) $(OBJS_INTERNAL)
-OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_INTERNAL) $(OBJS_LIBS) $(OBJS_SRC)
+OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_SRC) $(OBJS_LIBS)
+OBJS_TEST   = $(OBJS_SRC) $(OBJS_LIBS)
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_LIBS) $(OBJS_SRC)
 OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_LIBS) route.o request.o response.o protocol.o format.o
 
 .PHONY: all

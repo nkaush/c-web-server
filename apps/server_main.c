@@ -38,13 +38,6 @@ response_t* favicon(request_t* request) {
     response_t* r = response_from_file(STATUS_OK, fopen("./favicon.png", "r"));
     response_set_content_type(r, CONTENT_TYPE_PNG);
 
-    time_t expires = time(NULL) + 691200;
-    char buf[TIME_BUFFER_SIZE] = { 0 };
-    format_time(buf, expires);
-
-    response_set_header(r, "Expires", buf);
-    response_set_header(r, "Cache-Control", "public, max-age=691200");
-
     return r;
 }
 
