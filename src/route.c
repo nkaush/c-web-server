@@ -57,7 +57,7 @@ void node_destroy(node_t* node) {
     free(node);
 }
 
-void allocate_handler_array(node_t* node) {
+static inline void __allocate_handler_array(node_t* node) {
     node->handlers = calloc(NUM_HTTP_METHODS, sizeof(route_handler_t));
 }
 
@@ -88,7 +88,7 @@ void register_route(http_method method, const char* route, route_handler_t handl
     }
 
     if ( !curr->handlers )
-        allocate_handler_array(curr);
+        __allocate_handler_array(curr);
 
     if ( curr->handlers[(size_t) method] )
         WARN("Redefinition of route '%s %s'", http_method_to_string(method), route);

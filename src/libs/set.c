@@ -6,7 +6,7 @@
 
 #define NUM_PRIMES 38
 
-static size_t primes[NUM_PRIMES] = {
+static size_t PRIMES[NUM_PRIMES] = {
     17ul,         29ul,         37ul,        53ul,        67ul,
     79ul,         97ul,         131ul,       193ul,       257ul,
     389ul,        521ul,        769ul,       1031ul,      1543ul,
@@ -39,8 +39,8 @@ struct set {
 
 size_t find_prime(size_t target) {
     for (size_t i = 0; i < NUM_PRIMES; ++i) {
-        if (target < primes[i]) {
-            return primes[i];
+        if (target < PRIMES[i]) {
+            return PRIMES[i];
         }
     }
 

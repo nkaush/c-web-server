@@ -12,7 +12,7 @@ typedef struct queue_node {
     struct queue_node *next;
 } queue_node;
 
-queue_node* queue_node_init(void* data) {
+queue_node* __queue_node_init(void* data) {
     queue_node* this = malloc(sizeof(queue_node));
     this->data = data;
     this->next = NULL;
@@ -76,10 +76,10 @@ void queue_push(queue *this, void *data) {
     }
 
     if (this->head == NULL) {
-        this->head = queue_node_init(data);
+        this->head = __queue_node_init(data);
         this->tail = this->head;
     } else {
-        this->tail->next = queue_node_init(data);
+        this->tail->next = __queue_node_init(data);
         this->tail = this->tail->next;
     }
 

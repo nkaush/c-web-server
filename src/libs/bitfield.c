@@ -9,7 +9,7 @@ struct bitfield {
     unsigned char arr[0];
 };
 
-size_t align(size_t value, size_t alignment) {
+size_t __align(size_t value, size_t alignment) {
     return ((value - 1) | (alignment - 1)) + 1;
 }
 
@@ -17,7 +17,7 @@ bitfield* bitfield_create(size_t size) {
     assert(size > 0); 
 
     // round up to the nearest ALIGNMENT then divide to get array length
-    size_t array_length = align(size, ALIGNMENT) / ALIGNMENT;
+    size_t array_length = __align(size, ALIGNMENT) / ALIGNMENT;
     bitfield* this = calloc(1, array_length + sizeof(bitfield));
     this->size = size;
 

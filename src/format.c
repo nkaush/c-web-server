@@ -27,13 +27,13 @@ time_t parse_time_str(const char* time_buf) {
     return mktime(&gmt);
 }
 
-void print_client_connected(const char* addr, uint16_t port, int client_fd) {
 #ifdef __LOG_REQUESTS__
+void print_client_connected(const char* addr, uint16_t port, int client_fd) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
     printf("INFO [%s] [access] %s:%d connected on fd=%d...\n", time_buf, addr, port, client_fd);
-#endif
 }
+#endif
 
 double timespec_difftime(const timespec* start, const timespec* finish) {
     double delta = (finish->tv_sec - start->tv_sec) * NS_PER_SECOND;
@@ -43,17 +43,17 @@ double timespec_difftime(const timespec* start, const timespec* finish) {
     return duration;
 }
 
-double compute_speed(double duration, size_t content_len) {
+double __compute_speed(double duration, size_t content_len) {
     double speed = (content_len * 8) / duration;
     return speed / 1000000;
 }
 
+#ifdef __LOG_REQUESTS__
 void print_client_request_resolution(
         const char* addr, uint16_t port, const char* method, const char* route,
         const char* protocol, int status, const char* status_str, 
         size_t request_content_len, size_t response_content_len, 
         timespec* connected, timespec* connect_finish, timespec* send_begin) {
-#ifdef __LOG_REQUESTS__
     timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
     
@@ -62,8 +62,8 @@ void print_client_request_resolution(
     double send_duration = timespec_difftime(send_begin, &now);
     double total_duration = timespec_difftime(connected, &now);
 
-    double receive_speed = compute_speed(receive_duration, request_content_len);
-    double send_speed = compute_speed(send_duration, response_content_len);
+    double receive_speed = __compute_speed(receive_duration, request_content_len);
+    double send_speed = __compute_speed(send_duration, response_content_len);
 
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
@@ -85,8 +85,8 @@ void print_client_request_resolution(
         receive_duration, process_duration, send_duration, total_duration, 
         receive_speed, send_speed
     );
-#endif
 }
+#endif
 
 void print_server_details(const char* port) {
     char host_buffer[256];

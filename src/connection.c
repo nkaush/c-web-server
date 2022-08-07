@@ -66,7 +66,7 @@ void connection_destroy(void* ptr) {
     if ( this->client_address )
         free(this->client_address);
 
-    WARN("destroy connection on fd=%d", this->client_fd);
+    // WARN("destroy connection on fd=%d", this->client_fd);
     close(this->client_fd);
     free(this);
 }
@@ -97,21 +97,21 @@ void connection_shift_buffer(connection_t* conn) {
     conn->buf_ptr = 0;
 }
 
-void connection_resize_local_buffer(connection_t* conn, size_t buffer_size) {
+void __connection_resize_local_buffer(connection_t* conn, size_t buffer_size) {
     if ( conn->buf_size < buffer_size ) {
         buffer_size = MIN(MAX_BUFFER_SIZE, buffer_size);
-        LOG("resize local buffer to %zu", buffer_size);
+        // LOG("resize local buffer to %zu", buffer_size);
         conn->buf_size = buffer_size;
         conn->buf = realloc(conn->buf, conn->buf_size);
     }
 }
 
-void connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size) {
+void __connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size) {
     LOG("resize rcv buffer to %zu", buffer_size);
     setsockopt(conn->client_fd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 }
 
-void connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size) {
+void __connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size) {
     LOG("resize send buffer to %zu", buffer_size);
     setsockopt(conn->client_fd, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
 }
@@ -226,10 +226,10 @@ void connection_try_parse_headers(connection_t* conn) {
     conn->state = CS_HEADERS_PARSED;
 }
 
-void allocate_buffer_for_request(connection_t* conn) {
+void __allocate_buffer_for_request(connection_t* conn) {
     size_t target_size = conn->body_bytes_to_receive / MIN_RCV_CLKS;
     size_t new_buf_len = MIN(MAX_RCV_BUFFER_SIZE, target_size);
-    connection_resize_local_buffer(conn, new_buf_len);
+    __connection_resize_local_buffer(conn, new_buf_len);
 }
 
 void connection_read_request_body(connection_t* conn) {
@@ -255,7 +255,7 @@ void connection_read_request_body(connection_t* conn) {
 
         if ( conn->body_bytes_to_receive > MAX_RCV_BUFFER_SIZE ) {
             request_init_tmp_file_body(request, conn->body_bytes_to_receive);
-            allocate_buffer_for_request(conn);
+            __allocate_buffer_for_request(conn);
         } else {
             request_init_str_body(request, conn->body_bytes_to_receive);
         }
@@ -277,7 +277,7 @@ void connection_read_request_body(connection_t* conn) {
     }
 }
 
-int format_response_header(response_t* response, char** buffer) {
+int __format_response_header(response_t* response, char** buffer) {
     static const char* HEADER_FMT = "%s: %s\r\n";
     static const char* RESPONSE_HEADER_FMT = "HTTP/1.0 %d %s\r\n%s\r\n";
 
@@ -317,29 +317,18 @@ int format_response_header(response_t* response, char** buffer) {
 void connection_write_response_header(connection_t* connection) {
 #ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
     static char* IF_MODIFIED_SINCE_HEADER_KEY = "If-Modified-Since";
-    response_t* response = connection->response;
 
-    if ( response->rt == RT_FILE ) {
-        dictionary* request_headers = connection->request->headers;
+    dictionary* request_headers = connection->request->headers;
+    char* target = NULL;
 
-        if ( dictionary_contains(request_headers, IF_MODIFIED_SINCE_HEADER_KEY)) {
-            char* header_value = 
-                dictionary_get(request_headers, IF_MODIFIED_SINCE_HEADER_KEY);
+    if ( dictionary_contains(request_headers, IF_MODIFIED_SINCE_HEADER_KEY))
+        target = dictionary_get(request_headers, IF_MODIFIED_SINCE_HEADER_KEY);
 
-            char* last_modified_str = 
-                dictionary_get(connection->response->headers, "Last-Modified");
-            time_t last_modified = parse_time_str(last_modified_str);
-
-            if ( last_modified <= parse_time_str(header_value) ) {
-                response_destroy(connection->response);
-                connection->response = response_not_modified(NULL);
-            }
-        }
-    }
+    response_try_optimize_if_not_modified_since(&connection->response, target);
 #endif
 
     char* header_str = NULL;
-    int header_len = format_response_header(connection->response, &header_str);
+    int header_len = __format_response_header(connection->response, &header_str);
     
     write_all_to_socket(connection->client_fd, header_str, header_len);
     free(header_str);
@@ -347,17 +336,17 @@ void connection_write_response_header(connection_t* connection) {
     connection->state = CS_WRITING_RESPONSE_BODY;
 }
 
-void allocate_buffer_for_response(connection_t* conn) {
+void __allocate_buffer_for_response(connection_t* conn) {
     size_t target_size = conn->body_bytes_to_transmit / MIN_SND_CLKS;
     size_t new_buf_len = MIN(MAX_SND_BUFFER_SIZE, target_size);
 
-    connection_resize_local_buffer(conn, new_buf_len);
+    __connection_resize_local_buffer(conn, new_buf_len);
 
     new_buf_len *= 2;
     size_t snd_buffer_size = socket_snd_buf_size(conn->client_fd);
 
     if ( new_buf_len > snd_buffer_size ) 
-        connection_resize_sock_send_buf(conn, new_buf_len);
+        __connection_resize_sock_send_buf(conn, new_buf_len);
 }
 
 // @return -1 if there was an error, 1 if the request is ongoing, 0 if the request is complete
@@ -371,7 +360,7 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
             "%zu", &conn->body_bytes_to_transmit
         );
 
-        allocate_buffer_for_response(conn);
+        __allocate_buffer_for_response(conn);
         SET_RESPONSE_BODY_LENGTH_PARSED(conn);
 #ifdef __LOG_REQUESTS__
         clock_gettime(CLOCK_REALTIME, &conn->time_begin_send);

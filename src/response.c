@@ -90,6 +90,23 @@ response_t* response_from_file(http_status status, FILE* file) {
     return response;
 }
 
+#ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
+void response_try_optimize_if_not_modified_since(
+        response_t** response, char* target_date) {
+    response_t* r = *response;
+    if ( r->rt == RT_FILE && target_date) {
+        char* last_modified_str = 
+            dictionary_get(r->headers, "Last-Modified");
+        time_t last_modified = parse_time_str(last_modified_str);
+
+        if ( last_modified <= parse_time_str(target_date) ) {
+            response_destroy(r);
+            *response = response_not_modified(NULL);
+        }
+    }
+}
+#endif
+
 response_t* response_from_string(http_status status, const char* body) {
     response_t* response = response_create(status);
     response->body_content.body = strdup(body);

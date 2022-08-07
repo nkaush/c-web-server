@@ -5,7 +5,7 @@
 #define NUM_PRIMES 38
 #define ALPHA 0.7
 
-static size_t primes[NUM_PRIMES] = {
+static size_t PRIMES[NUM_PRIMES] = {
     17ul,         29ul,         37ul,        53ul,        67ul,
     79ul,         97ul,         131ul,       193ul,       257ul,
     389ul,        521ul,        769ul,       1031ul,      1543ul,
@@ -41,17 +41,17 @@ struct dictionary {
     compare comp;
 };
 
-size_t find_next_prime(size_t target) {
+size_t __find_next_prime(size_t target) {
     for (size_t i = 0; i < NUM_PRIMES; ++i) {
-        if (target < primes[i]) {
-            return primes[i];
+        if (target < PRIMES[i]) {
+            return PRIMES[i];
         }
     }
 
     return 0;
 }
 
-size_t dictionary_find_key(dictionary* this, void* elem) {
+size_t __dictionary_find_key(dictionary* this, void* elem) {
     size_t idx = this->hash_function(elem) % this->capacity;
     
     while ( bitfield_get(this->should_probe, idx) ) {
@@ -67,7 +67,7 @@ size_t dictionary_find_key(dictionary* this, void* elem) {
     return idx;
 }
 
-void dictionary_free_all_nodes(dictionary* this) {
+void __dictionary_free_all_nodes(dictionary* this) {
     dict_node_t* curr = this->head;
     dict_node_t* prev = NULL;
     while ( curr != NULL ) {
@@ -80,7 +80,7 @@ void dictionary_free_all_nodes(dictionary* this) {
     }
 }
 
-bool dictionary_should_resize(dictionary* this) {
+static inline bool __dictionary_should_resize(dictionary* this) {
     double a = (double) this->size;
     double b = (double) this->capacity;
 
@@ -120,7 +120,7 @@ dictionary* dictionary_create(hash_function_type hash_function, compare comp,
                               copy_constructor_type value_copy_constructor,
                               destructor_type value_destructor) {
     return dictionary_create_with_capacity(
-        find_next_prime(0), hash_function, comp, key_copy_constructor,
+        __find_next_prime(0), hash_function, comp, key_copy_constructor,
         key_destructor, value_copy_constructor, value_destructor
     );
 }
@@ -129,7 +129,7 @@ void dictionary_destroy(dictionary* this) {
     assert(this);
 
     bitfield_destroy(this->should_probe);
-    dictionary_free_all_nodes(this);
+    __dictionary_free_all_nodes(this);
     free(this->nodes);
 
     free(this);
@@ -153,15 +153,15 @@ size_t dictionary_size(dictionary* this) {
 
 bool dictionary_contains(dictionary* this, void* key) {
     assert(this);
-    return this->nodes[dictionary_find_key(this, key)] != NULL;
+    return this->nodes[__dictionary_find_key(this, key)] != NULL;
 }
 
 void* dictionary_get(dictionary* this, void* key) {
     assert(dictionary_contains(this, key));
-    return this->nodes[dictionary_find_key(this, key)]->value;
+    return this->nodes[__dictionary_find_key(this, key)]->value;
 }
 
-void dictionary_set_helper(dictionary* this, void* key, void* value) {
+void __dictionary_set_helper(dictionary* this, void* key, void* value) {
     size_t index = this->hash_function(key) % this->capacity;
     while ( this->nodes[index] ) {
         bool cmp = compare_equiv(this->comp, this->nodes[index]->key, key);
@@ -209,7 +209,7 @@ void dictionary_reserve(dictionary* this, size_t capacity) {
 
     this->size = 0;
     bitfield_destroy(this->should_probe);
-    this->capacity = find_next_prime(capacity);
+    this->capacity = __find_next_prime(capacity);
     this->should_probe = bitfield_create(this->capacity);
     this->nodes = calloc(this->capacity, sizeof(dict_node_t*));
 
@@ -220,7 +220,7 @@ void dictionary_reserve(dictionary* this, size_t capacity) {
     this->tail = NULL;
 
     while ( curr != NULL ) {
-        dictionary_set_helper(this, curr->key, curr->value);
+        __dictionary_set_helper(this, curr->key, curr->value);
 
         this->value_destructor(curr->value);
         this->key_destructor(curr->key);
@@ -238,17 +238,17 @@ void dictionary_reserve(dictionary* this, size_t capacity) {
 void dictionary_set(dictionary* this, void* key, void* value) {
     assert(this);
     
-    if ( dictionary_should_resize(this) )
+    if ( __dictionary_should_resize(this) )
         dictionary_reserve(this, this->capacity * 2);
 
-    dictionary_set_helper(this, key, value);
+    __dictionary_set_helper(this, key, value);
 }
 
 void dictionary_remove(dictionary* this, void* key) {
     assert(this);
     assert(dictionary_contains(this, key));
 
-    size_t index = dictionary_find_key(this, key);
+    size_t index = __dictionary_find_key(this, key);
     if ( this->nodes[index] != NULL ) {
         dict_node_t* to_delete = this->nodes[index];
         if ( to_delete->previous ) {
@@ -278,7 +278,7 @@ void dictionary_remove(dictionary* this, void* key) {
 void dictionary_clear(dictionary* this) {
     assert(this);
 
-    dictionary_free_all_nodes(this);
+    __dictionary_free_all_nodes(this);
     bitfield_destroy(this->should_probe);
     this->should_probe = bitfield_create(this->capacity);
 
