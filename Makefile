@@ -15,10 +15,12 @@ LD = clang
 # define all the compilation flags
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
 INC = -I./includes/
-CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
+CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE -pthread
 # CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
+
+LDFLAGS = -pthread
 
 # CFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 # LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
@@ -89,10 +91,10 @@ $(OBJS_DIR)/%-debug.o: $(TEST_DIR)/%.c | $(OBJS_DIR)
 #                          Rules to Link Executables                           #
 ################################################################################
 $(EXE_SERVER): $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-release.o)
-	$(LD) $^ -o $@
+	$(LD) $(LDFLAGS) $^ -o $@
 
 $(EXE_SERVER)-debug: $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ $(LDFLAGS_DEBUG) -o $@
+	$(LD) $(LDFLAGS) $^ $(LDFLAGS_DEBUG) -o $@
 
 $(EXE_CLIENT): $(OBJS_CLIENT:%.o=$(OBJS_DIR)/%-release.o)
 	$(LD) $^ -o $@
