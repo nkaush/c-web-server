@@ -15,12 +15,12 @@ LD = clang
 # define all the compilation flags
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
 INC = -I./includes/
-CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE -pthread
+CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
 # CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
 
-LDFLAGS = -pthread
+LDFLAGS = 
 
 # CFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
 # LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg

@@ -7,7 +7,6 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
@@ -24,7 +23,6 @@
 static struct kevent* events_array = NULL;
 static struct kevent* change_list = NULL;
 static size_t changes_queued = 0;
-pthread_mutex_t m_evt = PTHREAD_MUTEX_INITIALIZER;
 #elif defined(__linux__)
 #include <sys/epoll.h>
 static struct epoll_event* events_array = NULL;
@@ -97,10 +95,18 @@ void __server_setup_resources(void) {
 }
 
 static inline void __queue_event_change(int16_t filter, int fd, void* data) {
-    pthread_mutex_lock(&m_evt);
     EV_SET(change_list + changes_queued, fd, filter, EV_ADD, 0, 0, data);  // add EV_CLEAR?
     ++changes_queued;
-    pthread_mutex_unlock(&m_evt);
+}
+
+// static inline void __queue_event_delete(int fd) {
+//     EV_SET(change_list + changes_queued, fd, 0, EV_DELETE, 0, 0, NULL);
+//     ++changes_queued;
+// }
+
+static inline void __reset_queued_events(void) { 
+    // memset(change_list, 0, changes_queued * sizeof(struct kevent));
+    changes_queued = 0; 
 }
 
 // Handle an kqueue event triggered from a client requesting to connect.
@@ -219,8 +225,6 @@ void __server_cleanup(void) {
 
     if ( change_list ) 
         free(change_list);
-
-    pthread_mutex_destroy(&m_evt);
     
     close(server_socket);
 }
@@ -270,20 +274,17 @@ void server_launch(void) {
     int num_events = 0;
     while ( !stop_server ) {
 #if defined(__APPLE__)
-        pthread_mutex_lock(&m_evt);
         num_events = kevent(
             event_queue_fd, change_list, changes_queued, 
             events_array, MAX_FILE_DESCRIPTORS, NULL
         );
-        
-        changes_queued = 0; 
-        pthread_mutex_unlock(&m_evt);
+        __reset_queued_events();
 #elif defined(__linux__)
         num_events = epoll_wait(event_queue_fd, events_array, MAX_FILE_DESCRIPTORS, TIMEOUT_MS);
 #endif
         if ( num_events == -1 )  { break; }
 
-        for(int i = 0; i < num_events; ++i) {
+        for(int i = 0; i < num_events; i++) {
 #if defined(__APPLE__)
             int fd = events_array[i].ident;
 #elif defined(__linux__)
