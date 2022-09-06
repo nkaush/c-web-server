@@ -82,3 +82,7 @@ void response_set_content_length(response_t* response, size_t length);
 
 // Utility function to set any response header
 void response_set_header(response_t* response, const char* key, const char* value);
+
+#ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
+void response_try_optimize_if_not_modified_since(response_t** response, char* target_date);
+#endif
