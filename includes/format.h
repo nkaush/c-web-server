@@ -63,14 +63,20 @@ void format_current_time(char* buf);
 
 time_t parse_time_str(const char* time_buf);
 
+#ifndef __SKIP_LOG_REQUESTS__
+void init_logging(void);
+
+#ifdef __LOG_CONNECTS__
 void print_client_connected(const char* addr, uint16_t port, int client_fd);
+#endif
 
 void print_client_request_resolution(
     const char* addr, uint16_t port, const char* method, const char* route,
-    const char* protocol, int status, const char* status_str, 
+    const char* protocol, int fd, int status, const char* status_str, 
     size_t request_content_len, size_t response_content_len, 
     struct timespec* connected, struct timespec* connect_finish, 
     struct timespec* send_begin);
+#endif 
 
 void print_server_details(const char* port);
 

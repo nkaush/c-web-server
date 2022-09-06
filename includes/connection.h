@@ -56,7 +56,7 @@ typedef struct _connection {
     int client_fd;
     int buf_end;
     int buf_ptr;
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
     struct timespec time_connected;
     struct timespec time_received;
     struct timespec time_begin_send;
@@ -76,12 +76,6 @@ void connection_destroy(void* ptr);
 ssize_t connection_read(connection_t* conn, size_t event_data);
 
 void connection_shift_buffer(connection_t* conn);
-
-void connection_resize_local_buffer(connection_t* conn, size_t buffer_size);
-
-void connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size);
-
-void connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size);
 
 // Attempt to parse the http_method in a header received from a client.
 void connection_try_parse_verb(connection_t* conn);

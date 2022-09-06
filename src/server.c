@@ -1,8 +1,8 @@
 #include "connection.h"
 #include "io_utils.h"
 #include "format.h"
-#include "libs/dictionary.h"
-#include "libs/callbacks.h"
+#include "dictionary.h"
+#include "callbacks.h"
 #include "server.h"
 
 #include <sys/socket.h>
@@ -146,7 +146,7 @@ int __server_handle_new_client(void) {
         if ( epoll_ctl(event_queue_fd, EPOLL_CTL_ADD, client_fd, &event) < 0 )
             err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_ADD");
 #endif
-#ifdef __LOG_REQUESTS__
+#if !defined(__SKIP_LOG_REQUESTS__) && defined(__LOG_CONNECTS__)
         print_client_connected(c_init.client_address, c_init.client_port, client_fd);
 #endif
         return client_fd;
@@ -189,14 +189,14 @@ void __server_handle_client(connection_t* c, size_t event_data) {
 
     if ( c->state == CS_WRITING_RESPONSE_BODY ) {
         if ( !connection_try_send_response_body(c, event_data) ) {
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
             const char* http_method_str = http_method_to_string(c->request->method);
             const char* http_status_str = http_status_to_string(c->response->status);
 
             print_client_request_resolution(
                 c->client_address, c->client_port, http_method_str, 
-                c->request->path, c->request->protocol, c->response->status, 
-                http_status_str, c->body_bytes_to_receive, 
+                c->request->path, c->request->protocol, c->client_fd, 
+                c->response->status, http_status_str, c->body_bytes_to_receive, 
                 c->body_bytes_to_transmit, &c->time_connected,
                 &c->time_received, &c->time_begin_send
             );
@@ -241,6 +241,10 @@ void server_init(char* port) {
     __server_setup_socket(port);
     print_server_details(port);
     __server_setup_resources();
+
+#ifndef __SKIP_LOG_REQUESTS__
+    init_logging();
+#endif
 
 #if defined(__APPLE__)
     event_queue_fd = kqueue();

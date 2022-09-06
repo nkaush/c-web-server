@@ -11,11 +11,11 @@
 
 #define DEFAULT_RCV_BUFFER_SIZE (1UL << 13UL)
 #define MAX_RCV_BUFFER_SIZE (1UL << 23UL)
-#define MIN_RCV_CLKS 10
+#define MIN_RCV_CLKS 5
 
 #define DEFAULT_SND_BUFFER_SIZE (1UL << 16UL)
-#define MAX_SND_BUFFER_SIZE (1UL << 18UL)
-#define MIN_SND_CLKS 10
+#define MAX_SND_BUFFER_SIZE (1UL << 23UL)
+#define MIN_SND_CLKS 5
 
 #define MAX_BUFFER_SIZE MAX_RCV_BUFFER_SIZE
 
@@ -27,7 +27,7 @@ void* connection_init(void* ptr) {
     connection_t* this = malloc(sizeof(connection_t));
     this->state = CS_CLIENT_CONNECTED;
 
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
     clock_gettime(CLOCK_REALTIME, &this->time_connected);
 #endif
 
@@ -107,12 +107,12 @@ void __connection_resize_local_buffer(connection_t* conn, size_t buffer_size) {
 }
 
 void __connection_resize_sock_rcv_buf(connection_t* conn, size_t buffer_size) {
-    LOG("resize rcv buffer to %zu", buffer_size);
+    // LOG("resize rcv buffer to %zu", buffer_size);
     setsockopt(conn->client_fd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 }
 
 void __connection_resize_sock_send_buf(connection_t* conn, size_t buffer_size) {
-    LOG("resize send buffer to %zu", buffer_size);
+    // LOG("resize send buffer to %zu", buffer_size);
     setsockopt(conn->client_fd, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
 }
 
@@ -271,7 +271,7 @@ void connection_read_request_body(connection_t* conn) {
     size_t byte_diff = conn->body_bytes_to_receive - conn->body_bytes_received;
     if ( (is_put_or_post && byte_diff == 0) || !is_put_or_post ) {
         conn->state = CS_REQUEST_RECEIVED;
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
         clock_gettime(CLOCK_REALTIME, &conn->time_received);
 #endif
     }
@@ -362,7 +362,7 @@ int connection_try_send_response_body(connection_t* conn, size_t max_receivable)
 
         __allocate_buffer_for_response(conn);
         SET_RESPONSE_BODY_LENGTH_PARSED(conn);
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
         clock_gettime(CLOCK_REALTIME, &conn->time_begin_send);
 #endif
     }

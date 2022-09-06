@@ -1,0 +1,3 @@
+[submodule "c-data-structures"]
+	path = c-data-structures
+	url = https://github.com/nkaush/c-data-structures.git

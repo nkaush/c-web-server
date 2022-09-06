@@ -1,5 +1,5 @@
 #pragma once
-#include "libs/dictionary.h"
+#include "dictionary.h"
 #include "response.h"
 #include "request.h"
 

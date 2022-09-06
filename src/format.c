@@ -12,6 +12,10 @@ extern int h_errno;
 
 typedef struct timespec timespec;
 
+#ifndef __SKIP_LOG_REQUESTS__
+static FILE* log_file = NULL;
+#endif 
+
 void format_time(char* buf, time_t time) {
     struct tm gmt;
     strftime(buf, TIME_BUFFER_SIZE, TIME_FMT_GMT, gmtime_r(&time, &gmt));
@@ -27,11 +31,24 @@ time_t parse_time_str(const char* time_buf) {
     return mktime(&gmt);
 }
 
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
+void log_file_cleanup(void) {
+    // fflush(log_file);
+    // fclose(log_file);
+}
+
+void init_logging(void) {
+    log_file = stdout;
+    // log_file = fopen("log.log", "w");
+    // atexit(log_file_cleanup);
+}
+#endif
+
+#if !defined(__SKIP_LOG_REQUESTS__) && defined(__LOG_CONNECTS__)
 void print_client_connected(const char* addr, uint16_t port, int client_fd) {
     char time_buf[TIME_BUFFER_SIZE] = { 0 };
     format_current_time(time_buf);
-    printf("INFO [%s] [access] %s:%d connected on fd=%d...\n", time_buf, addr, port, client_fd);
+    fprintf(log_file, "INFO [%s] [access] %s:%d connected on fd=%d...\n", time_buf, addr, port, client_fd);
 }
 #endif
 
@@ -48,10 +65,10 @@ double __compute_speed(double duration, size_t content_len) {
     return speed / 1000000;
 }
 
-#ifdef __LOG_REQUESTS__
+#ifndef __SKIP_LOG_REQUESTS__
 void print_client_request_resolution(
         const char* addr, uint16_t port, const char* method, const char* route,
-        const char* protocol, int status, const char* status_str, 
+        const char* protocol, int fd, int status, const char* status_str, 
         size_t request_content_len, size_t response_content_len, 
         timespec* connected, timespec* connect_finish, timespec* send_begin) {
     timespec now;
@@ -75,13 +92,13 @@ void print_client_request_resolution(
         color = BOLDMAGENTA;
     }
 
-    printf(
-        "INFO [%s] [access] %s:%d \"%s %s %s\" -- %s%d %s "RESET
-        "[%zu bytes in / %zu bytes out] "
+    fprintf(
+        log_file, "INFO [%s] [access] %s:%d \"%s %s %s\" -- fd=%d -- %s%d %s "
+        RESET"[%zu bytes in / %zu bytes out] "
         "[%fs in / %fs handle / %fs out / %fs total] "
         "[%f Mbps in / %f Mbps out]\n", 
-        time_buf, addr, port, method, route, protocol, color, status, status_str, 
-        request_content_len, response_content_len, 
+        time_buf, addr, port, method, route, protocol, fd, color, status, 
+        status_str, request_content_len, response_content_len, 
         receive_duration, process_duration, send_duration, total_duration, 
         receive_speed, send_speed
     );

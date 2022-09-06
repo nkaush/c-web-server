@@ -1,5 +1,5 @@
 #pragma once
-#include "libs/dictionary.h"
+#include "dictionary.h"
 #include "protocol.h"
 #include "request.h"
 #include <stdio.h>
@@ -68,6 +68,11 @@ response_t* response_uri_too_long(request_t* request);
 // Response destructor. This does not need to be called by users as it will 
 // automatically be called internally.
 void response_destroy(response_t* response);
+
+#ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
+void response_try_optimize_if_not_modified_since(
+    response_t** response, char* target_date);
+#endif
 
 // Utility function to make it easier to set the Content-Type header
 void response_set_content_type(response_t* response, const char* content_type);

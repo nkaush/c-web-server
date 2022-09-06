@@ -2,7 +2,8 @@ OBJS_DIR     = .objs
 TEST_DIR     = tests
 SRC_DIR      = src
 APPS_DIR     = apps
-LIBS_DIR     = $(SRC_DIR)/libs
+LIBS_DIR     = libs
+LIBS_SRC_DIR = c-data-structures
 
 EXE_SERVER = server
 EXE_CLIENT = client
@@ -12,28 +13,28 @@ EXE_MAIN   = main
 CC = clang
 LD = clang
 
+PROVIDED_LIBRARIES:=$(shell find $(LIBS_DIR) -type f -name '*.a' 2>/dev/null)
+PROVIDED_LIBRARIES:=$(PROVIDED_LIBRARIES:libs/lib%.a=%)
+LDFLAGS = -Llibs/ $(foreach lib,$(PROVIDED_LIBRARIES),-l$(lib)) -lm
+
 # define all the compilation flags
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
-INC = -I./includes/
-CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE
+INC = -I./includes/ -I./c-data-structures/includes
+CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE -D__LOG_REQUESTS__
 # CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
 
-# CFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
-# LDFLAGS_TRACE = $(CFLAGS_DEBUG) -pg
-
 # Find object files for libraries
-OBJS_LIBS:=$(patsubst $(LIBS_DIR)/%.c,%.o,$(wildcard $(LIBS_DIR)/*.c))
 OBJS_SRC :=$(patsubst $(SRC_DIR)/%.c,%.o,$(wildcard $(SRC_DIR)/*.c))
 
 TEST_SRC_FILES:=$(wildcard $(TEST_DIR)/*.c)
 TEST_EXES:=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_SRC_FILES))
 
-OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_SRC) $(OBJS_LIBS)
-OBJS_TEST   = $(OBJS_SRC) $(OBJS_LIBS)
-OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_LIBS) $(OBJS_SRC)
-OBJS_MAIN   = $(EXE_MAIN).o $(OBJS_LIBS) route.o request.o response.o protocol.o format.o
+OBJS_CLIENT = $(EXE_CLIENT).o $(OBJS_SRC)
+OBJS_TEST   = $(OBJS_SRC)
+OBJS_SERVER = $(EXE_SERVER)_main.o $(OBJS_SRC)
+OBJS_MAIN   = $(EXE_MAIN).o route.o request.o response.o protocol.o format.o
 
 .PHONY: all
 all: release
@@ -41,9 +42,13 @@ all: release
 $(OBJS_DIR):
 	@mkdir -p $(OBJS_DIR)
 
+libs: $(LIBS_SRC_DIR)
+	@mkdir -p $(LIBS_DIR)
+	$(MAKE) -C $^ LIBS_DIR=../$(LIBS_DIR)
+
 .PHONY: print 
 print:
-	echo $(OBJS_SRC)
+	echo $(LDFLAGS)
 
 # build types
 .PHONY: release
@@ -67,13 +72,6 @@ $(OBJS_DIR)/%-debug.o: $(SRC_DIR)/%.c | $(OBJS_DIR)
 $(OBJS_DIR)/%-release.o: $(SRC_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_RELEASE) $< -o $@
 
-# Define rules to compile object files for libraries
-$(OBJS_DIR)/%-debug.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
-	$(CC) $(CFLAGS_DEBUG) $< -o $@
-
-$(OBJS_DIR)/%-release.o: $(LIBS_DIR)/%.c | $(OBJS_DIR)
-	$(CC) $(CFLAGS_RELEASE) $< -o $@
-
 # Define rules to compile object files for apps
 $(OBJS_DIR)/%-debug.o: $(APPS_DIR)/%.c | $(OBJS_DIR)
 	$(CC) $(CFLAGS_DEBUG) $< -o $@
@@ -89,19 +87,19 @@ $(OBJS_DIR)/%-debug.o: $(TEST_DIR)/%.c | $(OBJS_DIR)
 #                          Rules to Link Executables                           #
 ################################################################################
 $(EXE_SERVER): $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-release.o)
-	$(LD) $^ -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 $(EXE_SERVER)-debug: $(OBJS_SERVER:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ $(LDFLAGS_DEBUG) -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 $(EXE_CLIENT): $(OBJS_CLIENT:%.o=$(OBJS_DIR)/%-release.o)
-	$(LD) $^ -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 $(EXE_CLIENT)-debug: $(OBJS_CLIENT:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 $(EXE_MAIN): $(OBJS_MAIN:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 # Rules to link test executables
 $(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_TEST:%.o=$(OBJS_DIR)/%-debug.o)
@@ -112,7 +110,7 @@ $(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_TEST:%.o=$(OBJS_DIR)/%-debug.o)
 ################################################################################
 .PHONY: clean
 clean:
-	rm -rf .objs $(TEST_EXES) $(EXE_CLIENT) $(EXE_SERVER) $(EXE_CLIENT)-debug $(EXE_SERVER)-debug $(EXE_MAIN)
+	rm -rf .objs $(TEST_EXES) $(EXE_CLIENT) $(EXE_SERVER) $(EXE_CLIENT)-debug $(EXE_SERVER)-debug $(EXE_MAIN) $(LIBS_DIR)
 
 build:
 	docker build -t neilk3/linux-dev-env .
