@@ -21,7 +21,6 @@ LDFLAGS = -Llibs/ $(foreach lib,$(PROVIDED_LIBRARIES),-l$(lib)) -lm
 WARNINGS = -Wall -Wextra -Werror -Wno-error=unused-parameter -Wmissing-declarations -Wmissing-variable-declarations
 INC = -I./includes/ -I./c-data-structures/includes
 CFLAGS_COMMON = $(WARNINGS) $(INC) -std=c99 -c -MMD -MP -D_GNU_SOURCE -D__LOG_REQUESTS__
-# CFLAGS_COMMON += -D__LOG_REQUESTS__
 CFLAGS_RELEASE = $(CFLAGS_COMMON) -O2
 CFLAGS_DEBUG = $(CFLAGS_COMMON) -O0 -g -DDEBUG -pg
 
@@ -42,9 +41,10 @@ all: release
 $(OBJS_DIR):
 	@mkdir -p $(OBJS_DIR)
 
-libs: $(LIBS_SRC_DIR)
+.PHONY: libs
+$(LIBS_DIR):
 	@mkdir -p $(LIBS_DIR)
-	$(MAKE) -C $^ LIBS_DIR=../$(LIBS_DIR)
+	$(MAKE) -C $(LIBS_SRC_DIR) LIBS_DIR=../$(LIBS_DIR)
 
 .PHONY: print 
 print:
@@ -55,7 +55,7 @@ print:
 .PHONY: debug
 .PHONY: test
 
-release: $(EXE_CLIENT) $(EXE_SERVER) $(TEST_EXES) $(EXE_MAIN)
+release: $(EXE_SERVER) $(TEST_EXES) $(EXE_MAIN)
 debug:   clean $(EXE_SERVER)-debug
 test: 	 $(TEST_EXES)
 
@@ -103,7 +103,7 @@ $(EXE_MAIN): $(OBJS_MAIN:%.o=$(OBJS_DIR)/%-debug.o)
 
 # Rules to link test executables
 $(TEST_EXES): %: $(OBJS_DIR)/%-debug.o $(OBJS_TEST:%.o=$(OBJS_DIR)/%-debug.o)
-	$(LD) $^ -o $(notdir $@)
+	$(LD) $^ $(LDFLAGS) -o $(notdir $@)
 
 ################################################################################
 #                              Bash Command Rules                              #
@@ -125,7 +125,10 @@ start-release: build-release
 	docker run -it --rm -p 80:8000 -v `pwd`/favicon.png:/service/favicon.png neilk3/web-server
 
 trace: debug
-	sudo dtrace -s timing.d -c "./server-debug 80"
+	sudo dtrace -s trace/timing.d -c "./server-debug 80"
+
+fcalls: debug
+	sudo dtrace -s trace/fcalls.d -c "./server-debug 80"
 
 valgrind: server-debug
 	valgrind --leak-check=full --show-leak-kinds=all ./server-debug 8000

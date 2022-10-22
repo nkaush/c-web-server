@@ -99,11 +99,6 @@ static inline void __queue_event_change(int16_t filter, int fd, void* data) {
     ++changes_queued;
 }
 
-// static inline void __queue_event_delete(int fd) {
-//     EV_SET(change_list + changes_queued, fd, 0, EV_DELETE, 0, 0, NULL);
-//     ++changes_queued;
-// }
-
 static inline void __reset_queued_events(void) { 
     // memset(change_list, 0, changes_queued * sizeof(struct kevent));
     changes_queued = 0; 
@@ -201,11 +196,7 @@ void __server_handle_client(connection_t* c, size_t event_data) {
                 &c->time_received, &c->time_begin_send
             );
 #endif
-#if defined(__APPLE__)
-            /// @todo investigate if we really need this since we fixed the issue with close before register
-            // if ( IS_MULTI_CYCLE_RESPONSE_DELIVERY(c) )
-            //     __queue_event_delete(c->client_fd);
-#elif defined(__linux__)
+#if defined(__linux__)
             if (epoll_ctl(event_queue_fd, EPOLL_CTL_DEL, c->client_fd, NULL) < 0)
                 err(EXIT_FAILURE, "epoll_ctl EPOLL_CTL_DEL");
 #endif

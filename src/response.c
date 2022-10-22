@@ -183,10 +183,9 @@ void response_set_content_type(response_t* response, const char* content_type) {
 }
 
 void response_set_content_length(response_t* response, size_t length) {
-    char* buf = NULL;
-    asprintf(&buf, "%zu", length);
+    char buf[32];
+    sprintf(buf, "%zu", length);
     dictionary_set(response->headers, CONTENT_LENGTH_HEADER_KEY, buf);
-    free(buf);
 }
 
 void response_set_header(response_t* response, const char* key, const char* value) {

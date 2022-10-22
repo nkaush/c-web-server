@@ -316,6 +316,7 @@ int __format_response_header(response_t* response, char** buffer) {
 
 void connection_write_response_header(connection_t* connection) {
 #ifndef __DISABLE_HANDLE_IF_MODIFIED_SINCE__
+    // only do this if response is a file
     static char* IF_MODIFIED_SINCE_HEADER_KEY = "If-Modified-Since";
 
     dictionary* request_headers = connection->request->headers;
